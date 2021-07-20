@@ -1,7 +1,6 @@
 package com.jumperchuck.escpos;
 
 import android.annotation.SuppressLint;
-import android.app.Application;
 import android.content.Context;
 import android.hardware.usb.UsbDevice;
 
@@ -10,6 +9,9 @@ import com.jumperchuck.escpos.connection.SunmiConnection;
 import com.jumperchuck.escpos.connection.TcpConnection;
 import com.jumperchuck.escpos.connection.UsbConnection;
 import com.jumperchuck.escpos.printer.EscPosPrinter;
+import com.jumperchuck.escpos.scanner.BluetoothScanner;
+import com.jumperchuck.escpos.scanner.WlanScanner;
+import com.sunmi.peripheral.printer.SunmiPrinterService;
 
 public class PrinterManager {
 
@@ -17,7 +19,7 @@ public class PrinterManager {
     private static Context context;
 
     public static void init(Context ctx) {
-        context = ctx.getApplicationContext();
+        PrinterManager.context = ctx.getApplicationContext();
         SunmiConnection.init(context);
     }
 
@@ -45,11 +47,17 @@ public class PrinterManager {
             .context(context);
     }
 
-    public static void bluetoothScanner() {
-
+    public static SunmiPrinterService sunmiPrinterService() {
+        return SunmiConnection.getService();
     }
 
-    public static void wlanScanner() {
+    public static BluetoothScanner.Builder bluetoothScanner() {
+        return new BluetoothScanner.Builder()
+            .context(context);
+    }
 
+    public static WlanScanner.Builder wlanScanner() {
+        return new WlanScanner.Builder()
+            .context(context);
     }
 }

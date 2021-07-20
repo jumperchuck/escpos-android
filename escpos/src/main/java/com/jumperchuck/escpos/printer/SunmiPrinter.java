@@ -6,6 +6,7 @@ import android.util.Base64;
 
 import com.jumperchuck.escpos.connection.SunmiConnection;
 import com.jumperchuck.escpos.constant.PrinterStatus;
+import com.jumperchuck.escpos.util.HtmlUtils;
 import com.sunmi.peripheral.printer.SunmiPrinterService;
 
 /**
@@ -39,6 +40,12 @@ public class SunmiPrinter extends EscPosPrinter {
                         Bitmap bitmap = BitmapFactory.decodeByteArray(base64Bytes, 0, base64Bytes.length);
                         service.printBitmap(bitmap, null);
                         break;
+                    case Paper.COMMAND_HTML:
+                        Bitmap htmlBitmap = HtmlUtils.toBitmap(getContext(), (String) command.getValue(), getPrintWidth());
+                        if (htmlBitmap != null) {
+                            service.printBitmap(htmlBitmap, null);
+                        }
+                        break;
                     case Paper.COMMAND_LINE:
                         service.lineWrap(1, null);
                         break;
@@ -47,6 +54,15 @@ public class SunmiPrinter extends EscPosPrinter {
                         break;
                     case Paper.COMMAND_CUT_PAPER:
                         service.cutPaper(null);
+                        break;
+                    case Paper.COMMAND_TEXT:
+                        service.printText((String) command.getValue(), null);
+                        break;
+                    case Paper.COMMAND_BARCODE:
+                        // service.printBarCode((String) command.getValue());
+                        break;
+                    case Paper.COMMAND_QRCODE:
+                        // service.printQRCode((String) command.getValue());
                         break;
                 }
             }

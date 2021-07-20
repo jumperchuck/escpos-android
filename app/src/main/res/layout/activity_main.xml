@@ -19,6 +19,20 @@
         android:layout_height="40dp" />
 
     <Button
+        android:id="@+id/bt_select_bluetooth"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="选择蓝牙打印机" />
+
+    <Button
+        android:id="@+id/bt_select_wlan"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="选择局域网打印机" />
+    
+    <Button
         android:id="@+id/bt_print_image"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

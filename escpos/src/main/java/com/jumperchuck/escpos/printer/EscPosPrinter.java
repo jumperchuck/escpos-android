@@ -50,6 +50,10 @@ public abstract class EscPosPrinter {
         return printWidth;
     }
 
+    public boolean isConnected() {
+        return printerConnection.isConnected();
+    }
+
     /**
      * 连接
      */

@@ -3,7 +3,6 @@ package com.jumperchuck.escpos.printer;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
-import android.util.Log;
 
 import com.gprinter.command.CpclCommand;
 import com.gprinter.command.EscCommand;
@@ -42,12 +41,12 @@ public class GeneralPrinter extends EscPosPrinter {
 
     @Override
     public synchronized void open() {
-        if (printerConnection.isConnected()) {
+        if (isConnected()) {
             return;
         }
         currentPrinterStatus = null;
         printerConnection.connect();
-        if (printerConnection.isConnected()) {
+        if (isConnected()) {
             // 开启读取打印机返回数据线程
             reader = new Reader();
             reader.start();
@@ -58,7 +57,7 @@ public class GeneralPrinter extends EscPosPrinter {
         } else {
             // 连接失败, 重连一次
             printerConnection.connect();
-            if (printerConnection.isConnected()) {
+            if (isConnected()) {
                 // 开启读取打印机返回数据线程
                 reader = new Reader();
                 reader.start();
@@ -84,35 +83,37 @@ public class GeneralPrinter extends EscPosPrinter {
 
     @Override
     public synchronized PrinterStatus print(Paper paper) {
-        if (!printerConnection.isConnected()) {
+        if (!isConnected()) {
             open();
         }
         PrinterStatus printerStatus = getPrinterStatus();
-        if (printerStatus != PrinterStatus.NORMAL) {
-            return printerStatus;
-        }
-        try {
-            switch (printerCommand) {
-                case ESC:
-                    sendDataByEsc(paper);
-                    break;
-                case TSC:
-                    sendDataByEsc(paper);
-                    break;
-                case CPCL:
-                    sendDataByEsc(paper);
-                    break;
+        if (printerStatus == PrinterStatus.NORMAL) {
+            try {
+                switch (printerCommand) {
+                    case ESC:
+                        sendDataByEsc(paper);
+                        break;
+                    case TSC:
+                        sendDataByTsc(paper);
+                        break;
+                    case CPCL:
+                        sendDataByCpcl(paper);
+                        break;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                printerStatus = PrinterStatus.UNKNOWN_ERROR;
             }
-            return PrinterStatus.NORMAL;
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-        return PrinterStatus.UNKNOWN_ERROR;
+        if (paper.getListener() != null) {
+            paper.getListener().onPrintResult(this, printerStatus);
+        }
+        return printerStatus;
     }
 
     @Override
     public synchronized PrinterStatus getPrinterStatus() {
-        if (!printerConnection.isConnected()) {
+        if (!isConnected()) {
             return PrinterStatus.DISCONNECTED;
         }
         try {
@@ -128,6 +129,9 @@ public class GeneralPrinter extends EscPosPrinter {
                 }
                 Thread.sleep(100);
                 currentTime = System.currentTimeMillis();
+            }
+            if (currentPrinterStatus != null) {
+                return currentPrinterStatus;
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -257,7 +261,6 @@ public class GeneralPrinter extends EscPosPrinter {
                     escCommand.addPrintAndFeedLines((byte) 4);
                     break;
                 case Paper.COMMAND_HTML:
-                    Log.i("???", getContext() + "");
                     Bitmap htmlBitmap = HtmlUtils.toBitmap(getContext(), (String) command.getValue(), getPrintWidth());
                     if (htmlBitmap != null) {
                         escCommand.addRastBitImage(htmlBitmap, getPrintWidth(), 0);
@@ -272,6 +275,16 @@ public class GeneralPrinter extends EscPosPrinter {
                     break;
                 case Paper.COMMAND_CUT_PAPER:
                     escCommand.addCutPaper();
+                    break;
+                case Paper.COMMAND_TEXT:
+                    escCommand.addText((String) command.getValue());
+                    break;
+                case Paper.COMMAND_BARCODE:
+                    escCommand.addCODABAR((String) command.getValue());
+                    break;
+                case Paper.COMMAND_QRCODE:
+                    escCommand.addStoreQRCodeData((String) command.getValue());
+                    escCommand.addPrintQRCode();
                     break;
                 default:
                     break;
