@@ -7,6 +7,7 @@ import android.util.Base64;
 import com.gprinter.command.CpclCommand;
 import com.gprinter.command.EscCommand;
 import com.gprinter.command.LabelCommand;
+import com.jumperchuck.escpos.connection.SunmiConnection;
 import com.jumperchuck.escpos.connection.UsbConnection;
 import com.jumperchuck.escpos.constant.PrinterCommand;
 import com.jumperchuck.escpos.constant.PrinterStatus;
@@ -33,8 +34,6 @@ public class GeneralPrinter extends EscPosPrinter {
 
     private int queryPrinterCommandFlag;
 
-    private PrinterStatus currentPrinterStatus;
-
     public GeneralPrinter(Builder builder) {
         super(builder);
     }
@@ -45,11 +44,13 @@ public class GeneralPrinter extends EscPosPrinter {
             return;
         }
         currentPrinterStatus = null;
+        listener.onOpening();
         printerConnection.connect();
         if (isConnected()) {
             // 开启读取打印机返回数据线程
             reader = new Reader();
             reader.start();
+            listener.onOpened();
             if (printerCommand == null) {
                 // 查询打印机使用指令
                 queryPrinterCommand(); // 小票机连接不上 注释这行，添加下面那三行代码。使用ESC指令
@@ -61,6 +62,7 @@ public class GeneralPrinter extends EscPosPrinter {
                 // 开启读取打印机返回数据线程
                 reader = new Reader();
                 reader.start();
+                listener.onOpened();
                 if (printerCommand == null) {
                     // 查询打印机使用指令
                     queryPrinterCommand(); // 小票机连接不上 注释这行，添加下面那三行代码。使用ESC指令
@@ -78,7 +80,10 @@ public class GeneralPrinter extends EscPosPrinter {
             reader.cancel();
             reader = null;
         }
-        printerConnection.disconnect();
+        if (isConnected()) {
+            printerConnection.disconnect();
+            listener.onClosed();
+        }
     }
 
     @Override
@@ -86,8 +91,8 @@ public class GeneralPrinter extends EscPosPrinter {
         if (!isConnected()) {
             open();
         }
-        PrinterStatus printerStatus = getPrinterStatus();
-        if (printerStatus == PrinterStatus.NORMAL) {
+        PrinterStatus status = getPrinterStatus();
+        if (status == PrinterStatus.NORMAL) {
             try {
                 switch (printerCommand) {
                     case ESC:
@@ -102,107 +107,46 @@ public class GeneralPrinter extends EscPosPrinter {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-                printerStatus = PrinterStatus.UNKNOWN_ERROR;
+                status = PrinterStatus.UNKNOWN_ERROR;
             }
         }
         if (paper.getListener() != null) {
-            paper.getListener().onPrintResult(this, printerStatus);
+            paper.getListener().onPrintResult(this, status);
         }
-        return printerStatus;
+        sendStatusBroadcast(status);
+        return status;
     }
 
     @Override
     public synchronized PrinterStatus getPrinterStatus() {
-        if (!isConnected()) {
-            return PrinterStatus.DISCONNECTED;
-        }
-        try {
-            currentPrinterStatus = null;
-            if (printerCommand != null) {
-                sendByteDataImmediately(printerCommand.getCheckCommand());
-            }
-            long startTime = System.currentTimeMillis();
-            long currentTime = System.currentTimeMillis();
-            while (currentTime - startTime < 1500) {
-                if (currentPrinterStatus != null) {
-                    return currentPrinterStatus;
+        PrinterStatus status = currentPrinterStatus;
+        if (isConnected()) {
+            try {
+                currentPrinterStatus = null;
+                if (printerCommand != null) {
+                    sendByteDataImmediately(printerCommand.getCheckCommand());
                 }
-                Thread.sleep(100);
-                currentTime = System.currentTimeMillis();
+                long startTime = System.currentTimeMillis();
+                long currentTime = System.currentTimeMillis();
+                while (currentTime - startTime < 1500) {
+                    if (currentPrinterStatus != null) {
+                        status = currentPrinterStatus;
+                        break;
+                    }
+                    Thread.sleep(100);
+                    currentTime = System.currentTimeMillis();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-            if (currentPrinterStatus != null) {
-                return currentPrinterStatus;
+            if (status == null) {
+                status = PrinterStatus.UNKNOWN_ERROR;
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } else {
+            status = PrinterStatus.DISCONNECTED;
         }
-        return PrinterStatus.UNKNOWN_ERROR;
-
-       // try {
-       //     if (printerCommand != null) {
-       //         sendByteDataImmediately(printerCommand.getCheckCommand());
-       //     }
-       //     byte[] buffer = new byte[100];
-       //     int len = readDataImmediately(buffer);
-       //     if (printerCommand == null) {
-       //         switch (queryPrinterCommandFlag) {
-       //             case ESC:
-       //                 printerCommand = PrinterCommand.ESC;
-       //                 break;
-       //             case TSC:
-       //                 printerCommand = PrinterCommand.TSC;
-       //                 break;
-       //             case CPCL:
-       //                 printerCommand = PrinterCommand.CPCL;
-       //                 break;
-       //             default:
-       //                 printerCommand = PrinterCommand.ESC;
-       //                 break;
-       //         }
-       //     }
-       //     LogUtils.i("getPrinterStatus", "" + buffer[0] + " " + buffer[len - 1]);
-       //     if (len < 0 || buffer[0] == getPrinterStatusCommand(PrinterStatus.NORMAL)) {
-       //         return PrinterStatus.NORMAL;
-       //     }
-       //     if (checkPrinterStatus(buffer[0], PrinterStatus.COVER_OPEN)) {
-       //         return PrinterStatus.COVER_OPEN;
-       //     }
-       //     if (checkPrinterStatus(buffer[0], PrinterStatus.FEEDING)) {
-       //         return PrinterStatus.FEEDING;
-       //     }
-       //     if (checkPrinterStatus(buffer[0], PrinterStatus.PAPER_OUT)) {
-       //         return PrinterStatus.PAPER_OUT;
-       //     }
-       //     if (checkPrinterStatus(buffer[0], PrinterStatus.PAPER_ERROR)) {
-       //         return PrinterStatus.PAPER_ERROR;
-       //     }
-       //     if (checkPrinterStatus(buffer[0], PrinterStatus.CARBON_OUT)) {
-       //         return PrinterStatus.CARBON_OUT;
-       //     }
-       //     if (checkPrinterStatus(buffer[0], PrinterStatus.ERROR)) {
-       //         if (printerCommand == PrinterCommand.ESC) {
-       //             // ESC查询错误状态
-       //             sendByteDataImmediately(new byte[]{0x10, 0x04, 0x03});
-       //             len = readDataImmediately(buffer);
-       //             if (len < 0) return PrinterStatus.UNKNOWN_ERROR;
-       //             if (checkPrinterStatus(buffer[0], PrinterStatus.KNIFE_ERROR)) {
-       //                 return PrinterStatus.KNIFE_ERROR;
-       //             }
-       //             if (checkPrinterStatus(buffer[0], PrinterStatus.OVER_HEATING)) {
-       //                 return PrinterStatus.OVER_HEATING;
-       //             }
-       //             return PrinterStatus.UNKNOWN_ERROR;
-       //         }
-       //         return PrinterStatus.ERROR;
-       //     }
-       //     if (checkPrinterStatus(buffer[0], PrinterStatus.BLACK_LABEL_ERROR)) {
-       //         return PrinterStatus.BLACK_LABEL_ERROR;
-       //     }
-       // } catch (Exception e) {
-       //     e.printStackTrace();
-       //     close();
-       // }
-       // return PrinterStatus.UNKNOWN_ERROR;
+        sendStatusBroadcast(status);
+        return status;
     }
 
     private int getPrinterStatusCommand(PrinterStatus printerStatus) {
@@ -244,28 +188,41 @@ public class GeneralPrinter extends EscPosPrinter {
 
     private void sendDataByEsc(Paper paper) throws Exception {
         EscCommand escCommand = new EscCommand();
-        escCommand.addInitializePrinter();
         for (Paper.Command command : paper.getCommands()) {
             switch (command.getKey()) {
-                case Paper.COMMAND_IMAGE:
-                    Bitmap bitmap = null;
-                    Object value = command.getValue();
-                    if (value instanceof String) {
-                        // base64
-                        byte[] base64Bytes = Base64.decode((String) command.getValue(), Base64.DEFAULT);
-                        bitmap = BitmapFactory.decodeByteArray(base64Bytes, 0, base64Bytes.length);
-                    } else if (value instanceof Bitmap) {
-                        bitmap = (Bitmap) value;
+                case Paper.COMMAND_INIT:
+                    escCommand.addInitializePrinter();
+                    break;
+                case Paper.COMMAND_ALIGN:
+                    Paper.ALIGN align = (Paper.ALIGN) command.getValue();
+                    switch (align) {
+                        case LEFT:
+                            escCommand.addSelectJustification(EscCommand.JUSTIFICATION.LEFT);
+                            break;
+                        case CENTER:
+                            escCommand.addSelectJustification(EscCommand.JUSTIFICATION.CENTER);
+                            break;
+                        case RIGHT:
+                            escCommand.addSelectJustification(EscCommand.JUSTIFICATION.RIGHT);
+                            break;
                     }
-                    escCommand.addRastBitImage(bitmap, getPrintWidth(), 0);
-                    escCommand.addPrintAndFeedLines((byte) 4);
+                    break;
+                case Paper.COMMAND_IMAGE:
+                    Bitmap imageBitmap = null;
+                    Object imageValue = command.getValue();
+                    if (imageValue instanceof String) {
+                        byte[] base64Bytes = Base64.decode((String) imageValue, Base64.DEFAULT);
+                        imageBitmap = BitmapFactory.decodeByteArray(base64Bytes, 0, base64Bytes.length);
+                    } else if (imageValue instanceof Bitmap) {
+                        imageBitmap = (Bitmap) imageValue;
+                    }
+                    escCommand.addRastBitImage(imageBitmap, printWidth, 0);
+                    escCommand.addPrintAndLineFeed();
                     break;
                 case Paper.COMMAND_HTML:
-                    Bitmap htmlBitmap = HtmlUtils.toBitmap(getContext(), (String) command.getValue(), getPrintWidth());
-                    if (htmlBitmap != null) {
-                        escCommand.addRastBitImage(htmlBitmap, getPrintWidth(), 0);
-                        escCommand.addPrintAndFeedLines((byte) 4);
-                    }
+                    Bitmap htmlBitmap = HtmlUtils.toBitmap(context, (String) command.getValue(), printWidth);
+                    escCommand.addRastBitImage(htmlBitmap, printWidth, 0);
+                    escCommand.addPrintAndLineFeed();
                     break;
                 case Paper.COMMAND_LINE:
                     escCommand.addPrintAndLineFeed();
@@ -274,17 +231,91 @@ public class GeneralPrinter extends EscPosPrinter {
                     escCommand.addPrintAndFeedLines((byte) command.getValue());
                     break;
                 case Paper.COMMAND_CUT_PAPER:
+                    escCommand.addPrintAndFeedLines((byte) 3);
                     escCommand.addCutPaper();
                     break;
                 case Paper.COMMAND_TEXT:
                     escCommand.addText((String) command.getValue());
+                    escCommand.addPrintAndLineFeed();
                     break;
                 case Paper.COMMAND_BARCODE:
-                    escCommand.addCODABAR((String) command.getValue());
+                    String barcodeValue = (String) command.getValue();
+                    escCommand.addSetBarcodeHeight((byte) command.getValue3());
+                    escCommand.addSetBarcodeWidth((byte) command.getValue4());
+                    switch ((Paper.HRI_POSITION) command.getValue5()) {
+                        case NONE:
+                            escCommand.addSelectPrintingPositionForHRICharacters(EscCommand.HRI_POSITION.NO_PRINT);
+                            break;
+                        case TOP:
+                            escCommand.addSelectPrintingPositionForHRICharacters(EscCommand.HRI_POSITION.ABOVE);
+                            break;
+                        case BOTTOM:
+                            escCommand.addSelectPrintingPositionForHRICharacters(EscCommand.HRI_POSITION.BELOW);
+                            break;
+                        case BOTH:
+                            escCommand.addSelectPrintingPositionForHRICharacters(EscCommand.HRI_POSITION.ABOVE_AND_BELOW);
+                            break;
+                    }
+                    switch ((Paper.SYMBOLOGY) command.getValue2()) {
+                        case UPCA:
+                            escCommand.addUPCA(barcodeValue);
+                            break;
+                        case UPCE:
+                            escCommand.addUPCE(barcodeValue);
+                            break;
+                        case EAN13:
+                            escCommand.addEAN13(barcodeValue);
+                            break;
+                        case EAN8:
+                            escCommand.addEAN8(barcodeValue);
+                            break;
+                        case CODE39:
+                            escCommand.addCODE39(barcodeValue);
+                            break;
+                        case ITF:
+                            escCommand.addITF(barcodeValue);
+                            break;
+                        case CODABAR:
+                            escCommand.addCODABAR(barcodeValue);
+                            break;
+                        case CODE93:
+                            escCommand.addCODE93(barcodeValue);
+                            break;
+                        case CODE128:
+                            escCommand.addCODE128(barcodeValue);
+                            break;
+                        case CODE128A:
+                            escCommand.addCODE128(barcodeValue);
+                            break;
+                        case CODE128B:
+                            escCommand.addCODE128(escCommand.genCodeB(barcodeValue));
+                            break;
+                        case CODE128C:
+                            escCommand.addCODE128(escCommand.genCodeC(barcodeValue));
+                            break;
+                    }
+                    escCommand.addPrintAndLineFeed();
                     break;
                 case Paper.COMMAND_QRCODE:
+                    // TODO 转换成图片发送（部分佳博机型才支持此命令）
+                    switch ((Paper.ERROR_LEVEL) command.getValue3()) {
+                        case L:
+                            escCommand.addSelectErrorCorrectionLevelForQRCode((byte) 0x30);
+                            break;
+                        case M:
+                            escCommand.addSelectErrorCorrectionLevelForQRCode((byte) 0x31);
+                            break;
+                        case Q:
+                            escCommand.addSelectErrorCorrectionLevelForQRCode((byte) 0x32);
+                            break;
+                        case H:
+                            escCommand.addSelectErrorCorrectionLevelForQRCode((byte) 0x33);
+                            break;
+                    }
+                    escCommand.addSelectSizeOfModuleForQRCode((byte) command.getValue2());
                     escCommand.addStoreQRCodeData((String) command.getValue());
                     escCommand.addPrintQRCode();
+                    escCommand.addPrintAndLineFeed();
                     break;
                 default:
                     break;
@@ -352,7 +383,7 @@ public class GeneralPrinter extends EscPosPrinter {
     }
 
     private void queryPrinterCommand() {
-        queryPrinterCommandFlag = ESC;
+        queryPrinterCommandFlag = 0;
         ThreadPool.getInstance().addSerialTask(new Runnable() {
             @Override
             public void run() {
@@ -374,6 +405,7 @@ public class GeneralPrinter extends EscPosPrinter {
                             scheduledExecutorService.shutdown();
                             return;
                         }
+                        queryPrinterCommandFlag++;
                         try {
                             switch (queryPrinterCommandFlag) {
                                 case ESC:
@@ -391,7 +423,6 @@ public class GeneralPrinter extends EscPosPrinter {
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
-                        queryPrinterCommandFlag++;
                     }
                 }), 1500, 1500, TimeUnit.MILLISECONDS);
             }
@@ -401,7 +432,7 @@ public class GeneralPrinter extends EscPosPrinter {
     class Reader extends Thread {
         private boolean isRun = true;
 
-        private byte[] buffer = new byte[1];
+        private byte[] buffer = new byte[100];
 
         @Override
         public void run() {
@@ -424,9 +455,6 @@ public class GeneralPrinter extends EscPosPrinter {
                                 printerCommand = PrinterCommand.ESC;
                                 break;
                         }
-                    }
-                    if (len > 0) {
-                        LogUtils.i("getPrinterStatus", "" + buffer[0] + " " + buffer[len - 1]);
                     }
                     if (len < 0 || buffer[0] == getPrinterStatusCommand(PrinterStatus.NORMAL)) {
                         currentPrinterStatus = PrinterStatus.NORMAL;

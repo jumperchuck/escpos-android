@@ -5,16 +5,17 @@ import android.content.Intent;
 
 import com.jumperchuck.escpos.connection.PrinterConnection;
 import com.jumperchuck.escpos.connection.SunmiConnection;
+import com.jumperchuck.escpos.constant.ConnectType;
 import com.jumperchuck.escpos.constant.PrintWidth;
 import com.jumperchuck.escpos.constant.PrinterCommand;
 import com.jumperchuck.escpos.constant.PrinterStatus;
 
 public abstract class EscPosPrinter {
-    private int id;
+    protected int id;
 
-    private String name;
+    protected String name;
 
-    private Context context;
+    protected Context context;
 
     protected PrinterConnection printerConnection;
 
@@ -23,6 +24,8 @@ public abstract class EscPosPrinter {
     protected int printWidth;
 
     protected Listener listener;
+
+    protected PrinterStatus currentPrinterStatus;
 
     public EscPosPrinter(Builder builder) {
         this.id = builder.id;
@@ -42,16 +45,12 @@ public abstract class EscPosPrinter {
         return name;
     }
 
-    public Context getContext() {
-        return context;
-    }
-
-    public int getPrintWidth() {
-        return printWidth;
-    }
-
     public boolean isConnected() {
         return printerConnection.isConnected();
+    }
+
+    public ConnectType getConnectType() {
+        return printerConnection.connectType();
     }
 
     /**
@@ -78,19 +77,30 @@ public abstract class EscPosPrinter {
      * 发送广播
      */
     protected void sendStatusBroadcast(PrinterStatus printerStatus) {
+        if (currentPrinterStatus == printerStatus) return;
+        currentPrinterStatus = printerStatus;
+        listener.onStatusChanged(printerStatus);
         Intent intent = new Intent("PRINTER_STATUS");
         intent.putExtra("id", getId());
         intent.putExtra("name", getName());
-        intent.putExtra("connectType", printerConnection.connectType());
+        intent.putExtra("connectType", printerConnection.connectType().getName());
         intent.putExtra("code", printerStatus.getCode());
         intent.putExtra("message", printerStatus.getMessage());
-        getContext().sendBroadcast(intent);
+        context.sendBroadcast(intent);
     }
 
     public interface Listener {
+        void onOpening();
+
+        void onOpened();
+
         void onPrinted(Paper paper, PrinterStatus printerStatus);
 
-        void onError(PrinterStatus printerStatus);
+        void onClosed();
+
+        void onStatusChanged(PrinterStatus printerStatus);
+
+        void onError(Exception e);
     }
 
     public static final class Builder {
@@ -105,7 +115,7 @@ public abstract class EscPosPrinter {
 
         PrinterCommand printerCommand;
 
-        int printWidth = PrintWidth.WIDTH_80.getWidth();
+        int printWidth = PrintWidth.WIDTH_58.getWidth();
 
         EscPosPrinter.Listener listener;
 

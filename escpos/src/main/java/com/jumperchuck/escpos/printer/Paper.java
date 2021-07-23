@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Paper {
+    public static final String COMMAND_INIT = "command_init";
+    public static final String COMMAND_ALIGN= "command_align";
     public static final String COMMAND_TEXT = "command_text";
     public static final String COMMAND_IMAGE = "command_image";
     public static final String COMMAND_HTML = "command_html";
@@ -16,14 +18,7 @@ public class Paper {
     public static final String COMMAND_BARCODE = "command_barcode";
     public static final String COMMAND_QRCODE = "command_qrcode";
     public static final String COMMAND_CUT_PAPER = "command_cut_paper";
-
-    public static final String ALIGN_LEFT = "left";
-    public static final String ALIGN_CENTER = "center";
-    public static final String ALIGN_RIGHT = "right";
-
-    public static final String SIZE_DEFAULT = "default";
-    public static final String SIZE_LARGE = "large";
-    public static final String SIZE_BIG = "big";
+    public static final String COMMAND_SOUND = "command_sound";
 
     private List<Command> commands = new ArrayList<>();
 
@@ -39,6 +34,16 @@ public class Paper {
 
     public Listener getListener() {
         return listener;
+    }
+
+    public Paper addInit() {
+        this.commands.add(new Command(COMMAND_INIT));
+        return this;
+    }
+
+    public Paper addAlign(ALIGN align) {
+        this.commands.add(new Command(COMMAND_ALIGN, align));
+        return this;
     }
 
     public Paper addText(String text) {
@@ -66,18 +71,18 @@ public class Paper {
         return this;
     }
 
-    public Paper addLines(int n) {
+    public Paper addLines(byte n) {
         this.commands.add(new Command(COMMAND_LINES, n));
         return this;
     }
 
-    public Paper addBarcode(String value) {
-        this.commands.add(new Command(COMMAND_BARCODE, value));
+    public Paper addBarcode(String value, SYMBOLOGY symbology, byte height, byte width, HRI_POSITION hriPosition) {
+        this.commands.add(new Command(COMMAND_BARCODE, value, symbology, height, width, hriPosition));
         return this;
     }
 
-    public Paper addQrcode(String value) {
-        this.commands.add(new Command(COMMAND_QRCODE, value));
+    public Paper addQRCode(String value, byte moduleSize, ERROR_LEVEL errorLevel) {
+        this.commands.add(new Command(COMMAND_QRCODE, value, moduleSize, errorLevel));
         return this;
     }
 
@@ -86,13 +91,57 @@ public class Paper {
         return this;
     }
 
+    public Paper addSound() {
+        this.commands.add(new Command(COMMAND_SOUND));
+        return this;
+    }
+
     public interface Listener {
-        void onPrintResult(EscPosPrinter printerManager, PrinterStatus printerStatus);
+        void onPrintResult(EscPosPrinter printer, PrinterStatus printerStatus);
+    }
+
+    public enum ALIGN {
+        LEFT,
+        CENTER,
+        RIGHT
+    }
+
+    public enum SYMBOLOGY {
+        UPCA,
+        UPCE,
+        EAN13,
+        EAN8,
+        ITF,
+        CODABAR,
+        CODE39,
+        CODE93,
+        CODE128,
+        CODE128A,
+        CODE128B,
+        CODE128C
+    }
+
+    public enum HRI_POSITION {
+        NONE,
+        TOP,
+        BOTTOM,
+        BOTH
+    }
+
+    public enum ERROR_LEVEL {
+        L,
+        M,
+        Q,
+        H
     }
 
     public static class Command {
         private String key;
         private Object value;
+        private Object value2;
+        private Object value3;
+        private Object value4;
+        private Object value5;
 
         public Command(String key) {
             this.key = key;
@@ -103,20 +152,58 @@ public class Paper {
             this.value = value;
         }
 
-        public String getKey() {
-            return key;
+        public Command(String key, Object value, Object value2) {
+            this.key = key;
+            this.value = value;
+            this.value2 = value2;
         }
 
-        public void setKey(String key) {
+        public Command(String key, Object value, Object value2, Object value3) {
             this.key = key;
+            this.value = value;
+            this.value2 = value2;
+            this.value3 = value3;
+        }
+
+        public Command(String key, Object value, Object value2, Object value3, Object value4) {
+            this.key = key;
+            this.value = value;
+            this.value2 = value2;
+            this.value3 = value3;
+            this.value4 = value4;
+        }
+
+        public Command(String key, Object value, Object value2, Object value3, Object value4, Object value5) {
+            this.key = key;
+            this.value = value;
+            this.value2 = value2;
+            this.value3 = value3;
+            this.value4 = value4;
+            this.value5 = value5;
+        }
+
+        public String getKey() {
+            return key;
         }
 
         public Object getValue() {
             return value;
         }
 
-        public void setValue(Object value) {
-            this.value = value;
+        public Object getValue2() {
+            return value2;
+        }
+
+        public Object getValue3() {
+            return value3;
+        }
+
+        public Object getValue4() {
+            return value4;
+        }
+
+        public Object getValue5() {
+            return value5;
         }
     }
 }

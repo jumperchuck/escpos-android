@@ -9,45 +9,40 @@ import android.bluetooth.BluetoothDevice;
 import android.content.DialogInterface;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
-import android.util.Log;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import com.blankj.utilcode.util.ResourceUtils;
 import com.blankj.utilcode.util.ToastUtils;
 import com.jumperchuck.escpos.constant.PrintWidth;
-import com.jumperchuck.escpos.constant.PrinterCommand;
 import com.jumperchuck.escpos.constant.PrinterStatus;
 import com.jumperchuck.escpos.printer.Paper;
 import com.jumperchuck.escpos.printer.EscPosPrinter;
 import com.jumperchuck.escpos.scanner.DeviceScanner;
 
 import java.net.InetAddress;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 public class MainActivity extends AppCompatActivity {
 
-    private EditText etIp;
-    private EditText etPort;
+    private Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    private TextView tvPrinterInfo;
+    private TextView tvPrinterStatus;
+    private TextView tvPrinterConnected;
     private Button btSelectBluetooth;
     private Button btSelectWlan;
-    private Button btPrintImage;
-    private Button btPrintHtml;
-
-    private String ip = "192.168.123.100";
-    private int port = 9100;
+    private Button btPrint;
 
     private AlertDialog alertDialog;
     private AlertDialog.Builder alertBuilder;
     private EscPosPrinter printer;
     private DeviceScanner scanner;
-    private DeviceScanner.Listener listener = new DeviceScanner.Listener() {
+    private DeviceScanner.Listener scannerListener = new DeviceScanner.Listener() {
         @Override
         public void onStarted() {
             ToastUtils.showLong("设备扫描中...");
@@ -88,15 +83,22 @@ public class MainActivity extends AppCompatActivity {
                 new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialogInterface, int i) {
-
+                        Object item = devices.get(i);
+                        if (item instanceof InetAddress) {
+                            showInputTcpPrinter(((InetAddress) item).getHostAddress(), "9100");
+                        } else if (item instanceof BluetoothDevice) {
+                            String name = ((BluetoothDevice) item).getName();
+                            String address = ((BluetoothDevice) item).getAddress();
+                            initPrinter(PrinterManager.bluetoothPrinter(address).name(name + " / " + address));
+                        }
+                        alertDialog.cancel();
                     }
                 }
             );
             if (alertDialog != null) {
                 alertDialog.cancel();
             }
-            alertDialog = alertBuilder.create();
-            alertDialog.show();
+            alertDialog = alertBuilder.show();
         }
 
         @Override
@@ -115,49 +117,13 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        etIp = findViewById(R.id.et_printer_ip);
-        etPort = findViewById(R.id.et_printer_port);
-        btPrintImage = findViewById(R.id.bt_print_image);
-        btPrintHtml = findViewById(R.id.bt_print_html);
+        tvPrinterInfo = findViewById(R.id.tv_printer_info);
+        tvPrinterStatus = findViewById(R.id.tv_printer_status);
+        tvPrinterConnected = findViewById(R.id.tv_printer_connected);
+        btPrint = findViewById(R.id.bt_print);
         btSelectBluetooth = findViewById(R.id.bt_select_bluetooth);
         btSelectWlan = findViewById(R.id.bt_select_wlan);
-        alertBuilder = new AlertDialog.Builder(this);
 
-        etIp.setText(ip);
-        etPort.setText(String.valueOf(port));
-
-        etIp.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-
-            }
-
-            @Override
-            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                ip = etIp.getText().toString();
-            }
-
-            @Override
-            public void afterTextChanged(Editable editable) {
-
-            }
-        });
-        etPort.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-
-            }
-
-            @Override
-            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                port = Integer.parseInt(etPort.getText().toString());
-            }
-
-            @Override
-            public void afterTextChanged(Editable editable) {
-
-            }
-        });
         btSelectBluetooth.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -170,16 +136,24 @@ public class MainActivity extends AppCompatActivity {
                 showSelectWlanPrinter();
             }
         });
-        btPrintImage.setOnClickListener(new View.OnClickListener() {
+        btPrint.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                printImage();
+                print();
             }
         });
-        btPrintHtml.setOnClickListener(new View.OnClickListener() {
+
+        alertBuilder = new AlertDialog.Builder(this);
+        alertBuilder.setOnDismissListener(new DialogInterface.OnDismissListener() {
             @Override
-            public void onClick(View view) {
-                printHtml();
+            public void onDismiss(DialogInterface dialogInterface) {
+                scanner.stopScan();
+            }
+        });
+        alertBuilder.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialogInterface) {
+                scanner.stopScan();
             }
         });
 
@@ -191,108 +165,139 @@ public class MainActivity extends AppCompatActivity {
 
     public void showSelectBluetoothPrinter() {
         scanner = PrinterManager.bluetoothScanner()
-            .listener(listener)
+            .listener(scannerListener)
             .build();
         scanner.startScan();
         alertBuilder.setTitle("选择蓝牙打印机");
-        alertBuilder.setMessage("扫描中");
-        alertBuilder.setOnDismissListener(new DialogInterface.OnDismissListener() {
-            @Override
-            public void onDismiss(DialogInterface dialogInterface) {
-                scanner.stopScan();
-            }
-        });
-        alertBuilder.setOnCancelListener(new DialogInterface.OnCancelListener() {
-            @Override
-            public void onCancel(DialogInterface dialogInterface) {
-                scanner.stopScan();
-            }
-        });
+        alertBuilder.setMessage("扫描中...");
         if (alertDialog != null) {
             alertDialog.cancel();
         }
-        alertDialog = alertBuilder.create();
-        alertDialog.show();
+        alertDialog = alertBuilder.show();
     }
 
     public void showSelectWlanPrinter() {
         scanner = PrinterManager.wlanScanner()
-            .listener(listener)
+            .listener(scannerListener)
             .build();
         scanner.startScan();
         alertBuilder.setTitle("选择局域网打印机");
-        alertBuilder.setMessage("扫描中");
-        alertBuilder.setOnDismissListener(new DialogInterface.OnDismissListener() {
-            @Override
-            public void onDismiss(DialogInterface dialogInterface) {
-                scanner.stopScan();
-            }
-        });
-        alertBuilder.setOnCancelListener(new DialogInterface.OnCancelListener() {
-            @Override
-            public void onCancel(DialogInterface dialogInterface) {
-                scanner.stopScan();
-            }
-        });
+        alertBuilder.setMessage("扫描中...");
         if (alertDialog != null) {
             alertDialog.cancel();
         }
-        alertDialog = alertBuilder.create();
-        alertDialog.show();
+        alertDialog = alertBuilder.show();
     }
 
-    public void showInputTcpPrinter() {
-
+    public void showInputTcpPrinter(String defaultIp, String defaultPort) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = View.inflate(this, R.layout.dialog_input, null);
+        EditText editIP = view.findViewById(R.id.et_printer_ip);
+        EditText editPort = view.findViewById(R.id.et_printer_port);
+        editIP.setText(defaultIp);
+        editPort.setText(defaultPort);
+        builder.setTitle("输入打印机地址");
+        builder.setView(view);
+        builder.setPositiveButton("确定", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                String ip = editIP.getText().toString();
+                int port = Integer.parseInt(editPort.getText().toString());
+                initPrinter(PrinterManager.tcpPrinter(ip, port).name(ip + ":" + port));
+            }
+        });
+        builder.show();
     }
 
-    public EscPosPrinter initPrinter() {
+    public void initPrinter(EscPosPrinter.Builder builder) {
         if (printer != null) {
-            printer.close();
+            // printer.close();
         }
-        return printer = PrinterManager.tcpPrinter(ip, port)
-            .id(1)
-            .name("name")
-            .printWidth(PrintWidth.WIDTH_58.getWidth())
+        tvPrinterInfo.setText("");
+        tvPrinterStatus.setText("");
+        tvPrinterConnected.setText("");
+        printer = builder
+            .printWidth(PrintWidth.WIDTH_80.getWidth())
+            .listener(new EscPosPrinter.Listener() {
+                @Override
+                public void onOpening() {
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            tvPrinterInfo.setText(printer.getConnectType() + " / " + printer.getName());
+                            tvPrinterConnected.setText("connecting...");
+                        }
+                    });
+                }
+
+                @Override
+                public void onOpened() {
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            tvPrinterConnected.setText("connected");
+                        }
+                    });
+                }
+
+                @Override
+                public void onPrinted(Paper paper, PrinterStatus printerStatus) {
+
+                }
+
+                @Override
+                public void onClosed() {
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            tvPrinterConnected.setText("disconnected");
+                        }
+                    });
+                }
+
+                @Override
+                public void onStatusChanged(PrinterStatus printerStatus) {
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            tvPrinterStatus.setText(printerStatus.getMessage());
+                        }
+                    });
+                }
+
+                @Override
+                public void onError(Exception e) {
+
+                }
+            })
             .build();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                printer.open();
+            }
+        }).start();
     }
 
-    public void printImage() {
-        if (printer == null) return;
+    public void print() {
         new Thread() {
             public void run() {
+                if (printer == null) return;
                 Paper paper = new Paper();
                 paper.addImage(BitmapFactory.decodeResource(getResources(), R.drawable.printer));
                 paper.addCutPaper();
-                paper.setListener(new Paper.Listener() {
-                    @Override
-                    public void onPrintResult(EscPosPrinter printerManager, PrinterStatus printerStatus) {
-
-                    }
-                });
-                printer.open();
-                PrinterStatus printerStatus = printer.print(paper);
-                printer.close();
-                ToastUtils.showLong(printerStatus.getMessage());
-            }
-        }.start();
-    }
-
-    public void printHtml() {
-        if (printer == null) return;
-        new Thread() {
-            public void run() {
-                Paper paper = new Paper();
                 paper.addHtml(ResourceUtils.readRaw2String(R.raw.html));
                 paper.addCutPaper();
+                // paper.addQRCode("http://www.baidu.com", (byte) 3, Paper.ERROR_LEVEL.H);
+                // paper.addBarcode("3123040", Paper.SYMBOLOGY.CODE128, (byte) 40, (byte) 2, Paper.HRI_POSITION.NONE);
+                // paper.addCutPaper();
                 paper.setListener(new Paper.Listener() {
                     @Override
                     public void onPrintResult(EscPosPrinter printerManager, PrinterStatus printerStatus) {
 
                     }
                 });
-                printer.open();
                 PrinterStatus printerStatus = printer.print(paper);
-                printer.close();
                 ToastUtils.showLong(printerStatus.getMessage());
             }
         }.start();
