@@ -1,3 +1,4 @@
+
 package com.jumperchuck.escpos.connection;
 
 import com.gprinter.io.BluetoothPort;
@@ -6,13 +7,11 @@ import com.jumperchuck.escpos.constant.ConnectType;
 import java.io.IOException;
 import java.util.Vector;
 
-public class BluetoothConnection implements PrinterConnection {
+public class BluetoothConnection extends PrinterConnection {
     private BluetoothPort portManager;
 
-    private boolean isConnect;
-
     public BluetoothConnection(String macAddress) {
-        portManager = new BluetoothPort(macAddress);
+        this.portManager = new BluetoothPort(macAddress);
     }
 
     @Override
@@ -22,29 +21,23 @@ public class BluetoothConnection implements PrinterConnection {
 
     @Override
     public void connect() {
-        if (isConnect) return;
         isConnect = portManager.openPort();
     }
 
     @Override
     public void disconnect() {
-        portManager.closePort();
         isConnect = false;
+        portManager.closePort();
     }
 
     @Override
-    public boolean isConnected() {
-        return isConnect;
+    public void writeData(byte[] data, int off, int len) throws IOException {
+        portManager.writeDataImmediately(bytes2VectorByte(data), off, len);
     }
 
     @Override
-    public void writeData(Vector<Byte> data) throws IOException {
-        portManager.writeDataImmediately(data);
-    }
-
-    @Override
-    public void writeData(Vector<Byte> data, int offset, int len) throws IOException {
-        portManager.writeDataImmediately(data, offset, len);
+    public void writeData(Vector<Byte> data, int off, int len) throws IOException {
+        portManager.writeDataImmediately(data, off, len);
     }
 
     @Override

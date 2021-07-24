@@ -210,21 +210,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void initPrinter(EscPosPrinter.Builder builder) {
-        if (printer != null) {
-            // printer.close();
-        }
-        tvPrinterInfo.setText("");
-        tvPrinterStatus.setText("");
-        tvPrinterConnected.setText("");
         printer = builder
             .printWidth(PrintWidth.WIDTH_80.getWidth())
+            .feedBeforeCut((byte) 3)
             .listener(new EscPosPrinter.Listener() {
                 @Override
                 public void onOpening() {
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            tvPrinterInfo.setText(printer.getConnectType() + " / " + printer.getName());
                             tvPrinterConnected.setText("connecting...");
                         }
                     });
@@ -256,27 +250,14 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 @Override
-                public void onStatusChanged(PrinterStatus printerStatus) {
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            tvPrinterStatus.setText(printerStatus.getMessage());
-                        }
-                    });
-                }
-
-                @Override
                 public void onError(Exception e) {
 
                 }
             })
             .build();
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                printer.open();
-            }
-        }).start();
+        tvPrinterInfo.setText(printer.getConnectType() + " / " + printer.getName());
+        tvPrinterStatus.setText("");
+        tvPrinterConnected.setText("");
     }
 
     public void print() {
@@ -284,13 +265,21 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 if (printer == null) return;
                 Paper paper = new Paper();
-                paper.addImage(BitmapFactory.decodeResource(getResources(), R.drawable.printer));
-                paper.addCutPaper();
+                paper.addAlign(Paper.ALIGN.LEFT);
+                paper.addText("打印图片");
+                // paper.addImage(BitmapFactory.decodeResource(getResources(), R.drawable.printer));
+                // paper.addCutPaper();
+                paper.addAlign(Paper.ALIGN.CENTER);
+                paper.addText("打印HTML");
                 paper.addHtml(ResourceUtils.readRaw2String(R.raw.html));
                 paper.addCutPaper();
-                // paper.addQRCode("http://www.baidu.com", (byte) 3, Paper.ERROR_LEVEL.H);
-                // paper.addBarcode("3123040", Paper.SYMBOLOGY.CODE128, (byte) 40, (byte) 2, Paper.HRI_POSITION.NONE);
-                // paper.addCutPaper();
+                paper.addAlign(Paper.ALIGN.RIGHT);
+                paper.addText("打印二维码");
+                paper.addQRCode("http://www.baidu.com", (byte) 3, Paper.ERROR_LEVEL.H);
+                paper.addAlign(Paper.ALIGN.CENTER);
+                paper.addText("打印一维码");
+                paper.addBarcode("3123040", Paper.BARCODE_TYPE.CODABAR, (byte) 40, (byte) 2, Paper.HRI_POSITION.NONE);
+                paper.addCutPaper();
                 paper.setListener(new Paper.Listener() {
                     @Override
                     public void onPrintResult(EscPosPrinter printerManager, PrinterStatus printerStatus) {
@@ -298,6 +287,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
                 PrinterStatus printerStatus = printer.print(paper);
+                // printer.close();
                 ToastUtils.showLong(printerStatus.getMessage());
             }
         }.start();

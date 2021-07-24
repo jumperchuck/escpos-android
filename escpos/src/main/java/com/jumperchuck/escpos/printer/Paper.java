@@ -18,7 +18,6 @@ public class Paper {
     public static final String COMMAND_BARCODE = "command_barcode";
     public static final String COMMAND_QRCODE = "command_qrcode";
     public static final String COMMAND_CUT_PAPER = "command_cut_paper";
-    public static final String COMMAND_SOUND = "command_sound";
 
     private List<Command> commands = new ArrayList<>();
 
@@ -76,8 +75,8 @@ public class Paper {
         return this;
     }
 
-    public Paper addBarcode(String value, SYMBOLOGY symbology, byte height, byte width, HRI_POSITION hriPosition) {
-        this.commands.add(new Command(COMMAND_BARCODE, value, symbology, height, width, hriPosition));
+    public Paper addBarcode(String value, BARCODE_TYPE type, byte height, byte width, HRI_POSITION hriPosition) {
+        this.commands.add(new Command(COMMAND_BARCODE, value, type, height, width, hriPosition));
         return this;
     }
 
@@ -91,11 +90,6 @@ public class Paper {
         return this;
     }
 
-    public Paper addSound() {
-        this.commands.add(new Command(COMMAND_SOUND));
-        return this;
-    }
-
     public interface Listener {
         void onPrintResult(EscPosPrinter printer, PrinterStatus printerStatus);
     }
@@ -106,7 +100,7 @@ public class Paper {
         RIGHT
     }
 
-    public enum SYMBOLOGY {
+    public enum BARCODE_TYPE {
         UPCA,
         UPCE,
         EAN13,

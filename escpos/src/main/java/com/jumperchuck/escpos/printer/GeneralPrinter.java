@@ -1,5 +1,6 @@
 package com.jumperchuck.escpos.printer;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
@@ -7,9 +8,9 @@ import android.util.Base64;
 import com.gprinter.command.CpclCommand;
 import com.gprinter.command.EscCommand;
 import com.gprinter.command.LabelCommand;
-import com.jumperchuck.escpos.connection.SunmiConnection;
+import com.jumperchuck.escpos.connection.TcpConnection;
 import com.jumperchuck.escpos.connection.UsbConnection;
-import com.jumperchuck.escpos.constant.PrinterCommand;
+import com.jumperchuck.escpos.constant.CommandType;
 import com.jumperchuck.escpos.constant.PrinterStatus;
 import com.jumperchuck.escpos.util.HtmlUtils;
 import com.jumperchuck.escpos.util.LogUtils;
@@ -26,16 +27,28 @@ import java.util.concurrent.TimeUnit;
  * 通用打印机
  */
 public class GeneralPrinter extends EscPosPrinter {
+    private static String TAG = GeneralPrinter.class.getSimpleName();
     private final int ESC = 1;
     private final int TSC = 2;
     private final int CPCL = 3;
 
+    private CommandType commandType;
+
+    private int timeout;
+
+    private int soTimeout;
+
     private Reader reader;
+
+    private PrinterStatus currentStatus;
 
     private int queryPrinterCommandFlag;
 
-    public GeneralPrinter(Builder builder) {
+    private GeneralPrinter(Builder builder) {
         super(builder);
+        this.commandType = builder.commandType;
+        this.timeout = builder.timeout;
+        this.soTimeout = builder.soTimeout;
     }
 
     @Override
@@ -43,29 +56,32 @@ public class GeneralPrinter extends EscPosPrinter {
         if (isConnected()) {
             return;
         }
-        currentPrinterStatus = null;
+        if (connection instanceof TcpConnection) {
+            ((TcpConnection) connection).setTimeout(timeout);
+        }
+        currentStatus = null;
         listener.onOpening();
-        printerConnection.connect();
+        connection.connect();
         if (isConnected()) {
             // 开启读取打印机返回数据线程
             reader = new Reader();
             reader.start();
             listener.onOpened();
-            if (printerCommand == null) {
+            if (commandType == null) {
                 // 查询打印机使用指令
-                queryPrinterCommand(); // 小票机连接不上 注释这行，添加下面那三行代码。使用ESC指令
+                queryPrinterCommand();
             }
         } else {
             // 连接失败, 重连一次
-            printerConnection.connect();
+            connection.connect();
             if (isConnected()) {
                 // 开启读取打印机返回数据线程
                 reader = new Reader();
                 reader.start();
                 listener.onOpened();
-                if (printerCommand == null) {
+                if (commandType == null) {
                     // 查询打印机使用指令
-                    queryPrinterCommand(); // 小票机连接不上 注释这行，添加下面那三行代码。使用ESC指令
+                    queryPrinterCommand();
                 }
             } else {
                 close();
@@ -75,26 +91,26 @@ public class GeneralPrinter extends EscPosPrinter {
 
     @Override
     public synchronized void close() {
-        currentPrinterStatus = null;
+        currentStatus = PrinterStatus.DISCONNECTED;
         if (reader != null) {
             reader.cancel();
             reader = null;
         }
-        if (isConnected()) {
-            printerConnection.disconnect();
-            listener.onClosed();
-        }
+        connection.disconnect();
+        listener.onClosed();
+        sendStatusBroadcast(currentStatus);
     }
 
     @Override
     public synchronized PrinterStatus print(Paper paper) {
-        if (!isConnected()) {
-            open();
-        }
+        // 连接打印机
+        if (!isConnected()) open();
+        // 检测打印机状态
         PrinterStatus status = getPrinterStatus();
+
         if (status == PrinterStatus.NORMAL) {
             try {
-                switch (printerCommand) {
+                switch (commandType) {
                     case ESC:
                         sendDataByEsc(paper);
                         break;
@@ -105,52 +121,56 @@ public class GeneralPrinter extends EscPosPrinter {
                         sendDataByCpcl(paper);
                         break;
                 }
-            } catch (Exception e) {
+            } catch (IOException e) {
                 e.printStackTrace();
+                close();
                 status = PrinterStatus.UNKNOWN_ERROR;
             }
         }
         if (paper.getListener() != null) {
             paper.getListener().onPrintResult(this, status);
         }
-        sendStatusBroadcast(status);
         return status;
     }
 
     @Override
     public synchronized PrinterStatus getPrinterStatus() {
-        PrinterStatus status = currentPrinterStatus;
+        PrinterStatus status = currentStatus;
         if (isConnected()) {
             try {
-                currentPrinterStatus = null;
-                if (printerCommand != null) {
-                    sendByteDataImmediately(printerCommand.getCheckCommand());
+                currentStatus = null;
+                if (commandType != null) {
+                    sendData(commandType.getCheckCommand());
                 }
                 long startTime = System.currentTimeMillis();
                 long currentTime = System.currentTimeMillis();
-                while (currentTime - startTime < 1500) {
-                    if (currentPrinterStatus != null) {
-                        status = currentPrinterStatus;
+                while (currentTime - startTime < soTimeout) {
+                    if (currentStatus != null) {
+                        status = currentStatus;
                         break;
                     }
                     Thread.sleep(100);
                     currentTime = System.currentTimeMillis();
                 }
-            } catch (Exception e) {
+            } catch (IOException e) {
                 e.printStackTrace();
-            }
-            if (status == null) {
-                status = PrinterStatus.UNKNOWN_ERROR;
+                close();
+                status = PrinterStatus.DISCONNECTED;
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         } else {
             status = PrinterStatus.DISCONNECTED;
+        }
+        if (status == null) {
+            status = PrinterStatus.UNKNOWN_ERROR;
         }
         sendStatusBroadcast(status);
         return status;
     }
 
     private int getPrinterStatusCommand(PrinterStatus printerStatus) {
-        switch (printerCommand) {
+        switch (commandType) {
             case ESC:
                 return printerStatus.getEsc();
             case TSC:
@@ -162,7 +182,7 @@ public class GeneralPrinter extends EscPosPrinter {
     }
 
     private boolean checkPrinterStatus(byte b, PrinterStatus printerStatus) {
-        switch (printerCommand) {
+        switch (commandType) {
             case ESC:
                 if (printerStatus.getEsc() <= 0) return false;
                 if ((b & printerStatus.getEsc()) > 0) return true;
@@ -186,7 +206,7 @@ public class GeneralPrinter extends EscPosPrinter {
         return (byte) ((r & 0x10) >> 4);
     }
 
-    private void sendDataByEsc(Paper paper) throws Exception {
+    private void sendDataByEsc(Paper paper) throws IOException {
         EscCommand escCommand = new EscCommand();
         for (Paper.Command command : paper.getCommands()) {
             switch (command.getKey()) {
@@ -231,7 +251,9 @@ public class GeneralPrinter extends EscPosPrinter {
                     escCommand.addPrintAndFeedLines((byte) command.getValue());
                     break;
                 case Paper.COMMAND_CUT_PAPER:
-                    escCommand.addPrintAndFeedLines((byte) 3);
+                    if (feedBeforeCut > 0) {
+                        escCommand.addPrintAndFeedLines(feedBeforeCut);
+                    }
                     escCommand.addCutPaper();
                     break;
                 case Paper.COMMAND_TEXT:
@@ -256,7 +278,7 @@ public class GeneralPrinter extends EscPosPrinter {
                             escCommand.addSelectPrintingPositionForHRICharacters(EscCommand.HRI_POSITION.ABOVE_AND_BELOW);
                             break;
                     }
-                    switch ((Paper.SYMBOLOGY) command.getValue2()) {
+                    switch ((Paper.BARCODE_TYPE) command.getValue2()) {
                         case UPCA:
                             escCommand.addUPCA(barcodeValue);
                             break;
@@ -321,65 +343,41 @@ public class GeneralPrinter extends EscPosPrinter {
                     break;
             }
         }
-        sendDataImmediately(escCommand.getCommand());
+        sendData(escCommand.getCommand());
     }
 
-    private void sendDataByTsc(Paper paper) throws Exception {
+    private void sendDataByTsc(Paper paper) throws IOException {
         LabelCommand labelCommand = new LabelCommand();
-        for (Paper.Command command : paper.getCommands()) {
-            switch (command.getKey()) {
-                case Paper.COMMAND_IMAGE:
-                    break;
-                case Paper.COMMAND_LINE:
-                    break;
-                case Paper.COMMAND_LINES:
-                    break;
-                case Paper.COMMAND_CUT_PAPER:
-                    break;
-            }
-        }
-        sendDataImmediately(labelCommand.getCommand());
+        sendData(labelCommand.getCommand());
     }
 
-    private void sendDataByCpcl(Paper paper) throws Exception {
+    private void sendDataByCpcl(Paper paper) throws IOException {
         CpclCommand cpclCommand = new CpclCommand();
-        for (Paper.Command command : paper.getCommands()) {
-            switch (command.getKey()) {
-                case Paper.COMMAND_IMAGE:
-                    break;
-                case Paper.COMMAND_LINE:
-                    break;
-                case Paper.COMMAND_LINES:
-                    break;
-                case Paper.COMMAND_CUT_PAPER:
-                    break;
-            }
-        }
-        sendDataImmediately(cpclCommand.getCommand());
+        sendData(cpclCommand.getCommand());
     }
 
-    public void sendDataImmediately(Vector<Byte> data) throws IOException {
-        if (printerConnection == null) {
-            return;
-        }
+    public void sendData(Vector<Byte> data) throws IOException {
         try {
-            printerConnection.writeData(data, 0, data.size());
+            connection.writeData(data);
         } catch (Exception e) {
-            // 异常中断
             throw e;
         }
     }
 
-    public void sendByteDataImmediately(byte[] data) throws IOException {
-        Vector<Byte> datas = new Vector<>();
-        for (int i = 0; i < data.length; i++) {
-            datas.add(Byte.valueOf(data[i]));
+    public void sendData(byte[] data) throws IOException {
+        try {
+            connection.writeData(data);
+        } catch (IOException e) {
+            throw e;
         }
-        sendDataImmediately(datas);
     }
 
-    public int readDataImmediately(byte[] buffer) throws IOException {
-        return printerConnection.readData(buffer);
+    public int readData(byte[] buffer) throws IOException {
+        try {
+            return connection.readData(buffer);
+        } catch (IOException e) {
+            throw e;
+        }
     }
 
     private void queryPrinterCommand() {
@@ -392,30 +390,32 @@ public class GeneralPrinter extends EscPosPrinter {
                 scheduledExecutorService.scheduleAtFixedRate(threadFactory.newThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (printerCommand == null && queryPrinterCommandFlag > CPCL) {
-                            if (printerConnection instanceof UsbConnection) { // 三种状态查询，完毕均无返回值，默认票据（针对凯仕、盛源机器USB查询指令没有返回值，导致连不上）
-                                printerCommand = PrinterCommand.ESC;
+                        if (commandType == null && queryPrinterCommandFlag > CPCL) {
+                            if (connection instanceof UsbConnection) { // 三种状态查询，完毕均无返回值，默认票据（针对凯仕、盛源机器USB查询指令没有返回值，导致连不上）
+                                commandType = CommandType.ESC;
                                 scheduledExecutorService.shutdown();
-                            } else { // 三种状态，查询无返回值，发送连接失败广播
+                            } else if (reader != null) { // 三种状态，查询无返回值，发送连接失败广播
                                 close();
                                 scheduledExecutorService.shutdown();
                             }
                         }
-                        if (printerCommand != null) {
-                            scheduledExecutorService.shutdown();
+                        if (commandType != null) {
+                            if (!scheduledExecutorService.isShutdown()) {
+                                scheduledExecutorService.shutdown();
+                            }
                             return;
                         }
                         queryPrinterCommandFlag++;
                         try {
                             switch (queryPrinterCommandFlag) {
                                 case ESC:
-                                    sendByteDataImmediately(PrinterCommand.ESC.getCheckCommand());
+                                    sendData(CommandType.ESC.getCheckCommand());
                                     break;
                                 case TSC:
-                                    sendByteDataImmediately(PrinterCommand.TSC.getCheckCommand());
+                                    sendData(CommandType.TSC.getCheckCommand());
                                     break;
                                 case CPCL:
-                                    sendByteDataImmediately(PrinterCommand.CPCL.getCheckCommand());
+                                    sendData(CommandType.CPCL.getCheckCommand());
                                     break;
                                 default:
                                     break;
@@ -439,58 +439,60 @@ public class GeneralPrinter extends EscPosPrinter {
             try {
                 while (isRun) {
                     // 读取打印机返回信息,打印机没有返回值返回-1
-                    int len = readDataImmediately(buffer);
-                    if (printerCommand == null) {
+                    int len = readData(buffer);
+                    if (commandType == null) {
                         switch (queryPrinterCommandFlag) {
                             case ESC:
-                                printerCommand = PrinterCommand.ESC;
+                                commandType = CommandType.ESC;
                                 break;
                             case TSC:
-                                printerCommand = PrinterCommand.TSC;
+                                commandType = CommandType.TSC;
                                 break;
                             case CPCL:
-                                printerCommand = PrinterCommand.CPCL;
+                                commandType = CommandType.CPCL;
                                 break;
                             default:
-                                printerCommand = PrinterCommand.ESC;
+                                commandType = CommandType.ESC;
                                 break;
                         }
                     }
+                    LogUtils.d(TAG, "read: " + len + " buffer: " + buffer[0]);
                     if (len < 0 || buffer[0] == getPrinterStatusCommand(PrinterStatus.NORMAL)) {
-                        currentPrinterStatus = PrinterStatus.NORMAL;
+                        currentStatus = PrinterStatus.NORMAL;
                     } else if (checkPrinterStatus(buffer[0], PrinterStatus.COVER_OPEN)) {
-                        currentPrinterStatus = PrinterStatus.COVER_OPEN;
+                        currentStatus = PrinterStatus.COVER_OPEN;
                     } else if (checkPrinterStatus(buffer[0], PrinterStatus.FEEDING)) {
-                        currentPrinterStatus = PrinterStatus.FEEDING;
+                        currentStatus = PrinterStatus.FEEDING;
                     } else if (checkPrinterStatus(buffer[0], PrinterStatus.PAPER_OUT)) {
-                        currentPrinterStatus = PrinterStatus.PAPER_OUT;
+                        currentStatus = PrinterStatus.PAPER_OUT;
                     } else if (checkPrinterStatus(buffer[0], PrinterStatus.PAPER_ERROR)) {
-                        currentPrinterStatus = PrinterStatus.PAPER_ERROR;
+                        currentStatus = PrinterStatus.PAPER_ERROR;
                     } else if (checkPrinterStatus(buffer[0], PrinterStatus.CARBON_OUT)) {
-                        currentPrinterStatus = PrinterStatus.CARBON_OUT;
+                        currentStatus = PrinterStatus.CARBON_OUT;
                     } else if (checkPrinterStatus(buffer[0], PrinterStatus.ERROR)) {
-                        if (printerCommand == PrinterCommand.ESC) {
+                        if (commandType == CommandType.ESC) {
                             // ESC查询错误状态
-                            sendByteDataImmediately(new byte[]{0x10, 0x04, 0x03});
-                            len = readDataImmediately(buffer);
+                            sendData(new byte[]{0x10, 0x04, 0x03});
+                            len = readData(buffer);
                             if (len < 0) {
-                                currentPrinterStatus = PrinterStatus.UNKNOWN_ERROR;
+                                currentStatus = PrinterStatus.UNKNOWN_ERROR;
                             } else if (checkPrinterStatus(buffer[0], PrinterStatus.KNIFE_ERROR)) {
-                                currentPrinterStatus = PrinterStatus.KNIFE_ERROR;
+                                currentStatus = PrinterStatus.KNIFE_ERROR;
+                            } else if (checkPrinterStatus(buffer[0], PrinterStatus.OVER_HEATING)) {
+                                currentStatus = PrinterStatus.OVER_HEATING;
+                            } else {
+                                currentStatus = PrinterStatus.UNKNOWN_ERROR;
                             }
-                            if (checkPrinterStatus(buffer[0], PrinterStatus.OVER_HEATING)) {
-                                currentPrinterStatus = PrinterStatus.OVER_HEATING;
-                            }
-                            currentPrinterStatus = PrinterStatus.UNKNOWN_ERROR;
                         } else {
-                            currentPrinterStatus = PrinterStatus.ERROR;
+                            currentStatus = PrinterStatus.ERROR;
                         }
                     } else if (checkPrinterStatus(buffer[0], PrinterStatus.BLACK_LABEL_ERROR)) {
-                        currentPrinterStatus = PrinterStatus.BLACK_LABEL_ERROR;
+                        currentStatus = PrinterStatus.BLACK_LABEL_ERROR;
                     } else {
-                        currentPrinterStatus = PrinterStatus.UNKNOWN_ERROR;
+                        currentStatus = PrinterStatus.UNKNOWN_ERROR;
                     }
-                    LogUtils.i("getPrinterStatus", currentPrinterStatus.getMessage());
+                    LogUtils.d(TAG, "readPrinterStatus: " + currentStatus.getCode() + " / " + currentStatus.getMessage());
+                    sendStatusBroadcast(currentStatus);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -500,6 +502,39 @@ public class GeneralPrinter extends EscPosPrinter {
 
         public void cancel() {
             isRun = false;
+        }
+    }
+
+    public static class Builder extends EscPosPrinter.Builder<Builder> {
+
+        CommandType commandType;
+
+        int timeout = 6000;
+
+        int soTimeout = 2000;
+
+        public Builder(Context context) {
+            super(context);
+        }
+
+        public Builder commandType(CommandType commandType) {
+            this.commandType = commandType;
+            return this;
+        }
+
+        public Builder timeout(int timeout) {
+            this.timeout = timeout;
+            return this;
+        }
+
+        public Builder soTimeout(int soTimeout) {
+            this.soTimeout = soTimeout;
+            return this;
+        }
+
+        @Override
+        public GeneralPrinter build() {
+            return new GeneralPrinter(this);
         }
     }
 }

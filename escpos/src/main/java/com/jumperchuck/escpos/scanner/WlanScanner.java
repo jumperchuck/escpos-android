@@ -1,5 +1,6 @@
 package com.jumperchuck.escpos.scanner;
 
+import android.content.Context;
 import android.os.AsyncTask;
 import android.util.Log;
 
@@ -189,8 +190,8 @@ public class WlanScanner extends DeviceScanner {
     }
 
     public final static class Builder extends DeviceScanner.Builder<Builder> {
-        public Builder() {
-
+        public Builder(Context context) {
+            super(context);
         }
 
         @Override

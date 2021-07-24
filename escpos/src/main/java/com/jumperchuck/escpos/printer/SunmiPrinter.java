@@ -1,7 +1,9 @@
 package com.jumperchuck.escpos.printer;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.RemoteException;
 import android.util.Base64;
 
 import com.jumperchuck.escpos.connection.SunmiConnection;
@@ -13,18 +15,18 @@ import com.sunmi.peripheral.printer.SunmiPrinterService;
  * 商米内置打印机
  */
 public class SunmiPrinter extends EscPosPrinter {
-    public SunmiPrinter(Builder builder) {
+    private SunmiPrinter(Builder builder) {
         super(builder);
     }
 
     @Override
     public synchronized void open() {
-        printerConnection.connect();
+        connection.connect();
     }
 
     @Override
     public synchronized void close() {
-        printerConnection.disconnect();
+        connection.disconnect();
     }
 
     @Override
@@ -78,6 +80,9 @@ public class SunmiPrinter extends EscPosPrinter {
                             service.lineWrap((int) command.getValue(), null);
                             break;
                         case Paper.COMMAND_CUT_PAPER:
+                            if (feedBeforeCut > 0) {
+                                service.lineWrap(feedBeforeCut, null);
+                            }
                             service.cutPaper(null);
                             break;
                         case Paper.COMMAND_TEXT:
@@ -87,7 +92,7 @@ public class SunmiPrinter extends EscPosPrinter {
                             String barcodeValue = (String) command.getValue();
                             int barcodeSymbology = 0;
                             int barcodeTextPosition = 0;
-                            switch ((Paper.SYMBOLOGY) command.getValue2()) {
+                            switch ((Paper.BARCODE_TYPE) command.getValue2()) {
                                 case UPCA:
                                     barcodeSymbology = 0;
                                     break;
@@ -186,7 +191,7 @@ public class SunmiPrinter extends EscPosPrinter {
 
     @Override
     public PrinterStatus getPrinterStatus() {
-        PrinterStatus status = currentPrinterStatus;
+        PrinterStatus status = PrinterStatus.NORMAL;
         if (isConnected()) {
             SunmiPrinterService service = SunmiConnection.getService();
             try {
@@ -228,7 +233,7 @@ public class SunmiPrinter extends EscPosPrinter {
                     default:
                         status = PrinterStatus.UNKNOWN_ERROR;
                 }
-            } catch (Exception e) {
+            } catch (RemoteException e) {
                 e.printStackTrace();
                 status = PrinterStatus.UNKNOWN_ERROR;
             }
@@ -237,5 +242,16 @@ public class SunmiPrinter extends EscPosPrinter {
         }
         sendStatusBroadcast(status);
         return status;
+    }
+
+    public static class Builder extends EscPosPrinter.Builder<Builder> {
+        public Builder(Context context) {
+            super(context);
+        }
+
+        @Override
+        public SunmiPrinter build() {
+            return new SunmiPrinter(this);
+        }
     }
 }

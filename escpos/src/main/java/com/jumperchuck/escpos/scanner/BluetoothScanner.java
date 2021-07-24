@@ -45,15 +45,15 @@ public class BluetoothScanner extends DeviceScanner {
             return;
         }
         isScanning = true;
+        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (bluetoothAdapter.isDiscovering()) {
+            bluetoothAdapter.cancelDiscovery();
+        }
         IntentFilter intent = new IntentFilter();
         intent.addAction(BluetoothDevice.ACTION_FOUND);
         intent.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         intent.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         context.registerReceiver(bluetoothReceiver, intent);
-        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (bluetoothAdapter.isDiscovering()) {
-            bluetoothAdapter.cancelDiscovery();
-        }
         bluetoothAdapter.startDiscovery();
     }
 
@@ -76,8 +76,8 @@ public class BluetoothScanner extends DeviceScanner {
     }
 
     public static class Builder extends DeviceScanner.Builder<Builder> {
-        public Builder() {
-
+        public Builder(Context context) {
+            super(context);
         }
 
         @Override

@@ -1,6 +1,6 @@
 package com.jumperchuck.escpos.constant;
 
-public enum PrinterCommand {
+public enum CommandType {
     /**
      * ESC指令 查询打印机状态
      */
@@ -19,7 +19,7 @@ public enum PrinterCommand {
 
     private byte[] checkCommand;
 
-    PrinterCommand(byte[] checkCommand) {
+    CommandType(byte[] checkCommand) {
         this.checkCommand = checkCommand;
     }
 

@@ -9,10 +9,8 @@ import com.jumperchuck.escpos.constant.ConnectType;
 import java.io.IOException;
 import java.util.Vector;
 
-public class UsbConnection implements PrinterConnection {
+public class UsbConnection extends PrinterConnection {
     private UsbPort portManager;
-
-    private boolean isConnect;
 
     public UsbConnection(Context context, UsbDevice usbDevice) {
         this.portManager = new UsbPort(context, usbDevice);
@@ -25,33 +23,27 @@ public class UsbConnection implements PrinterConnection {
 
     @Override
     public void connect() {
-        if (isConnect) return;
         isConnect = portManager.openPort();
     }
 
     @Override
     public void disconnect() {
-        portManager.closePort();
         isConnect = false;
+        portManager.closePort();
     }
 
     @Override
-    public boolean isConnected() {
-        return isConnect;
+    public void writeData(byte[] data, int off, int len) throws IOException {
+        portManager.writeDataImmediately(bytes2VectorByte(data), off, len);
     }
 
     @Override
-    public void writeData(Vector<Byte> data) throws IOException {
-        this.portManager.writeDataImmediately(data);
-    }
-
-    @Override
-    public void writeData(Vector<Byte> data, int offset, int len) throws IOException {
-        this.portManager.writeDataImmediately(data, offset, len);
+    public void writeData(Vector<Byte> data, int off, int len) throws IOException {
+        portManager.writeDataImmediately(data, off, len);
     }
 
     @Override
     public int readData(byte[] bytes) throws IOException {
-        return this.portManager.readData(bytes);
+        return portManager.readData(bytes);
     }
 }

@@ -4,10 +4,8 @@ import android.content.Context;
 import android.content.Intent;
 
 import com.jumperchuck.escpos.connection.PrinterConnection;
-import com.jumperchuck.escpos.connection.SunmiConnection;
 import com.jumperchuck.escpos.constant.ConnectType;
 import com.jumperchuck.escpos.constant.PrintWidth;
-import com.jumperchuck.escpos.constant.PrinterCommand;
 import com.jumperchuck.escpos.constant.PrinterStatus;
 
 public abstract class EscPosPrinter {
@@ -17,23 +15,21 @@ public abstract class EscPosPrinter {
 
     protected Context context;
 
-    protected PrinterConnection printerConnection;
-
-    protected PrinterCommand printerCommand;
+    protected PrinterConnection connection;
 
     protected int printWidth;
 
+    byte feedBeforeCut;
+
     protected Listener listener;
 
-    protected PrinterStatus currentPrinterStatus;
-
-    public EscPosPrinter(Builder builder) {
+    EscPosPrinter(Builder builder) {
         this.id = builder.id;
         this.name = builder.name;
         this.context = builder.context;
-        this.printerConnection = builder.printerConnection;
-        this.printerCommand = builder.printerCommand;
+        this.connection = builder.connection;
         this.printWidth = builder.printWidth;
+        this.feedBeforeCut = builder.feedBeforeCut;
         this.listener = builder.listener;
     }
 
@@ -46,11 +42,11 @@ public abstract class EscPosPrinter {
     }
 
     public boolean isConnected() {
-        return printerConnection.isConnected();
+        return connection.isConnected();
     }
 
     public ConnectType getConnectType() {
-        return printerConnection.connectType();
+        return connection.connectType();
     }
 
     /**
@@ -77,13 +73,10 @@ public abstract class EscPosPrinter {
      * 发送广播
      */
     protected void sendStatusBroadcast(PrinterStatus printerStatus) {
-        if (currentPrinterStatus == printerStatus) return;
-        currentPrinterStatus = printerStatus;
-        listener.onStatusChanged(printerStatus);
         Intent intent = new Intent("PRINTER_STATUS");
         intent.putExtra("id", getId());
         intent.putExtra("name", getName());
-        intent.putExtra("connectType", printerConnection.connectType().getName());
+        intent.putExtra("connectType", connection.connectType().getName());
         intent.putExtra("code", printerStatus.getCode());
         intent.putExtra("message", printerStatus.getMessage());
         context.sendBroadcast(intent);
@@ -98,12 +91,10 @@ public abstract class EscPosPrinter {
 
         void onClosed();
 
-        void onStatusChanged(PrinterStatus printerStatus);
-
         void onError(Exception e);
     }
 
-    public static final class Builder {
+    public abstract static class Builder<T extends Builder> {
 
         int id;
 
@@ -111,54 +102,53 @@ public abstract class EscPosPrinter {
 
         Context context;
 
-        PrinterConnection printerConnection;
+        PrinterConnection connection;
 
-        PrinterCommand printerCommand;
+        int printWidth = PrintWidth.WIDTH_80.getWidth();
 
-        int printWidth = PrintWidth.WIDTH_58.getWidth();
+        byte feedBeforeCut;
 
         EscPosPrinter.Listener listener;
 
-        public EscPosPrinter.Builder id(int id) {
-            this.id = id;
-            return this;
-        }
-
-        public EscPosPrinter.Builder name(String name) {
-            this.name = name;
-            return this;
-        }
-
-        public EscPosPrinter.Builder context(Context context) {
+        Builder(Context context) {
             this.context = context;
-            return this;
         }
 
-        public EscPosPrinter.Builder printerConnection(PrinterConnection printerConnection) {
-            this.printerConnection = printerConnection;
-            return this;
+        public T id(int id) {
+            this.id = id;
+            return (T) this;
         }
 
-        public EscPosPrinter.Builder printerCommand(PrinterCommand printerCommand) {
-            this.printerCommand = printerCommand;
-            return this;
+        public T name(String name) {
+            this.name = name;
+            return (T) this;
         }
 
-        public EscPosPrinter.Builder printWidth(int printWidth) {
+        public T context(Context context) {
+            this.context = context;
+            return (T) this;
+        }
+
+        public T connection(PrinterConnection connection) {
+            this.connection = connection;
+            return (T) this;
+        }
+
+        public T printWidth(int printWidth) {
             this.printWidth = printWidth;
-            return this;
+            return (T) this;
         }
 
-        public EscPosPrinter.Builder listener(EscPosPrinter.Listener listener) {
+        public T feedBeforeCut(byte feedBeforeCut) {
+            this.feedBeforeCut = feedBeforeCut;
+            return (T) this;
+        }
+
+        public T listener(EscPosPrinter.Listener listener) {
             this.listener = listener;
-            return this;
+            return (T) this;
         }
 
-        public EscPosPrinter build() {
-            if (printerConnection instanceof SunmiConnection) {
-                return new SunmiPrinter(this);
-            }
-            return new GeneralPrinter(this);
-        }
+        public abstract EscPosPrinter build();
     }
 }
