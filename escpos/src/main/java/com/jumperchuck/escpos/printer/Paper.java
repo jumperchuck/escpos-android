@@ -21,6 +21,8 @@ public class Paper {
     public static final String COMMAND_BARCODE = "command_barcode";
     public static final String COMMAND_QRCODE = "command_qrcode";
     public static final String COMMAND_CUT_PAPER = "command_cut_paper";
+    public static final String COMMAND_BEEP = "command_beep";
+    public static final String COMMAND_OPEN_DRAWER = "command_open_drawer";
 
     private List<Command> commands = new ArrayList<>();
 
@@ -80,6 +82,16 @@ public class Paper {
 
     public Paper addCutPaper() {
         this.commands.add(new Command(COMMAND_CUT_PAPER));
+        return this;
+    }
+
+    public Paper addBeep(byte n, byte time) {
+        this.commands.add(new Command(COMMAND_BEEP, n, time));
+        return this;
+    }
+
+    public Paper addOpenDrawer() {
+        this.commands.add(new Command(COMMAND_OPEN_DRAWER));
         return this;
     }
 

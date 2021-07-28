@@ -45,6 +45,10 @@ public interface PrinterCommander {
 
         void addQRCode(String content, byte moduleSize, ErrorLevel errorLevel);
 
+        void addBeep(byte n, byte time);
+
+        void addOpenDrawer();
+
         int startSend() throws IOException;
     }
 }

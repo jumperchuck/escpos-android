@@ -65,6 +65,13 @@
         android:text="选择局域网打印机" />
 
     <Button
+        android:id="@+id/bt_select_sunmi"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="选择商米内置打印机" />
+
+    <Button
         android:id="@+id/bt_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

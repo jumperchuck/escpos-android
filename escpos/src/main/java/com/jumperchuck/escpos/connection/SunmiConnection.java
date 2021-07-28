@@ -38,6 +38,8 @@ public class SunmiConnection extends PrinterConnection {
         return service;
     }
 
+    private boolean isConnect;
+
     public SunmiConnection(Context context) {
 
     }
@@ -49,17 +51,17 @@ public class SunmiConnection extends PrinterConnection {
 
     @Override
     public void connect() {
-
+        isConnect = true;
     }
 
     @Override
     public void disconnect() {
-
+        isConnect = false;
     }
 
     @Override
     public boolean isConnected() {
-        return service != null;
+        return isConnect && service != null;
     }
 
     @Override

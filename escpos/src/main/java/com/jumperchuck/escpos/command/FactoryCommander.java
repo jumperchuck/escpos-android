@@ -211,6 +211,16 @@ public class FactoryCommander implements PrinterCommander {
         }
 
         @Override
+        public void addBeep(byte n, byte time) {
+            this.tasks.add(sender -> sender.addBeep(n, time));
+        }
+
+        @Override
+        public void addOpenDrawer() {
+            this.tasks.add(sender -> sender.addOpenDrawer());
+        }
+
+        @Override
         public int startSend() throws IOException {
             ReadUtils.readSync(() -> commander, 5000);
             if (commander == null) {

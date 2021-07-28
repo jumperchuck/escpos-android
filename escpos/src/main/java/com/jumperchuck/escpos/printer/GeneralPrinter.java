@@ -4,10 +4,8 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
-import android.webkit.WebView;
 
 import com.jumperchuck.escpos.command.PrinterCommander;
-import com.jumperchuck.escpos.connection.SunmiConnection;
 import com.jumperchuck.escpos.connection.TcpConnection;
 import com.jumperchuck.escpos.constant.AlignType;
 import com.jumperchuck.escpos.constant.BarcodeType;
@@ -65,8 +63,10 @@ public class GeneralPrinter extends EscPosPrinter {
             reader.cancelRead();
             reader = null;
         }
+        if (isConnected()) {
+            sendStatusBroadcast(PrinterStatus.DISCONNECTED);
+        }
         connection.disconnect();
-        sendStatusBroadcast(PrinterStatus.DISCONNECTED);
     }
 
     @Override
@@ -135,6 +135,12 @@ public class GeneralPrinter extends EscPosPrinter {
                         );
                         sender.addPrint();
                         break;
+                    case Paper.COMMAND_BEEP:
+                        sender.addBeep((byte) command.getValue(), (byte) command.getValue2());
+                        break;
+                    case Paper.COMMAND_OPEN_DRAWER:
+                        sender.addOpenDrawer();
+                        break;
                     default:
                         break;
                 }
@@ -150,7 +156,7 @@ public class GeneralPrinter extends EscPosPrinter {
 
     @Override
     public synchronized PrinterStatus getPrinterStatus() {
-        if (!isConnected()) {
+        if (!isConnected() || reader == null) {
             return PrinterStatus.DISCONNECTED;
         }
         PrinterStatus status = PrinterStatus.UNKNOWN_ERROR;

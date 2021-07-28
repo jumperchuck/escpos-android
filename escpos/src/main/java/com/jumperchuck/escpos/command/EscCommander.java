@@ -3,6 +3,7 @@ package com.jumperchuck.escpos.command;
 import android.graphics.Bitmap;
 
 import com.gprinter.command.EscCommand;
+import com.gprinter.command.LabelCommand;
 import com.jumperchuck.escpos.connection.PrinterConnection;
 import com.jumperchuck.escpos.constant.AlignType;
 import com.jumperchuck.escpos.constant.BarcodeType;
@@ -58,7 +59,7 @@ public class EscCommander implements PrinterCommander {
                             currentStatus = PrinterStatus.NORMAL;
                         } else if ((buffer[0] & 0x03) > 0) {
                             // 纸将尽
-                            currentStatus = PrinterStatus.PAPER_OUT;
+                            currentStatus = PrinterStatus.NORMAL;
                         } else if ((buffer[0] & 0x0C) > 0) {
                             // 缺纸
                             currentStatus = PrinterStatus.PAPER_OUT;
@@ -69,8 +70,6 @@ public class EscCommander implements PrinterCommander {
                         // 实时状态
                         if (len < 0) {
                             currentStatus = PrinterStatus.NORMAL;
-                        } else if (buffer[0] == 18) {
-                            currentStatus = PrinterStatus.NORMAL;
                         } else if ((buffer[0] & 0x04) > 0) {
                             currentStatus = PrinterStatus.COVER_OPEN;
                         } else if ((buffer[0] & 0x08) > 0) {
@@ -78,19 +77,19 @@ public class EscCommander implements PrinterCommander {
                         } else if ((buffer[0] & 0x20) > 0) {
                             currentStatus = PrinterStatus.PAPER_OUT;
                         } else if ((buffer[0] & 0x40) > 0) {
-                            // currentStatus = PrinterStatus.ERROR;
+                            currentStatus = PrinterStatus.ERROR;
                             // ESC查询错误状态
-                            connection.writeData(new byte[]{0x10, 0x04, 0x03});
-                            len = connection.readData(buffer);
-                            if (len < 0) {
-                                currentStatus = PrinterStatus.ERROR;
-                            } else if ((buffer[0] & 0x08) > 0) {
-                                currentStatus = PrinterStatus.KNIFE_ERROR;
-                            } else if ((buffer[0] & 0x40) > 0) {
-                                currentStatus = PrinterStatus.OVER_HEATING;
-                            } else {
-                                currentStatus = PrinterStatus.ERROR;
-                            }
+                            // connection.writeData(new byte[]{0x10, 0x04, 0x03});
+                            // len = connection.readData(buffer);
+                            // if (len < 0) {
+                            //     currentStatus = PrinterStatus.ERROR;
+                            // } else if ((buffer[0] & 0x08) > 0) {
+                            //     currentStatus = PrinterStatus.KNIFE_ERROR;
+                            // } else if ((buffer[0] & 0x40) > 0) {
+                            //     currentStatus = PrinterStatus.OVER_HEATING;
+                            // } else {
+                            //     currentStatus = PrinterStatus.ERROR;
+                            // }
                         } else {
                             currentStatus = PrinterStatus.NORMAL;
                         }
@@ -264,6 +263,16 @@ public class EscCommander implements PrinterCommander {
             command.addSelectSizeOfModuleForQRCode(moduleSize);
             command.addStoreQRCodeData(content);
             command.addPrintQRCode();
+        }
+
+        @Override
+        public void addBeep(byte n, byte time) {
+            command.addSound(n, time);
+        }
+
+        @Override
+        public void addOpenDrawer() {
+            command.addGeneratePlus(LabelCommand.FOOT.F2, (byte) 0x40, (byte) 0x50);
         }
 
         @Override

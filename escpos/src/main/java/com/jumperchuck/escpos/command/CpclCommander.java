@@ -99,6 +99,16 @@ public class CpclCommander implements PrinterCommander {
         }
 
         @Override
+        public void addBeep(byte n, byte time) {
+
+        }
+
+        @Override
+        public void addOpenDrawer() {
+
+        }
+
+        @Override
         public int startSend() throws IOException {
             return 0;
         }

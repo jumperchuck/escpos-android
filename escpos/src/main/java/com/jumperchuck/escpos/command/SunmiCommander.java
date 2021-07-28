@@ -237,6 +237,18 @@ public class SunmiCommander implements PrinterCommander {
         }
 
         @Override
+        public void addBeep(byte n, byte time) {
+
+        }
+
+        @Override
+        public void addOpenDrawer() {
+            this.tasks.add(service -> {
+                service.openDrawer(null);
+            });
+        }
+
+        @Override
         public int startSend() throws IOException {
             SunmiPrinterService service = SunmiConnection.getService();
             if (service == null) {
@@ -245,11 +257,15 @@ public class SunmiCommander implements PrinterCommander {
             try {
                 service.enterPrinterBuffer(true);
                 for (Task task : tasks) {
-                    task.invoke(service);
+                    try {
+                        task.invoke(service);
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
                 }
                 service.exitPrinterBuffer(true);
                 return 0;
-            } catch (Exception e) {
+            } catch (RemoteException e) {
                 e.printStackTrace();
                 throw new IOException();
             }

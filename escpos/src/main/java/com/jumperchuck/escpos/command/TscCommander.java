@@ -46,12 +46,16 @@ public class TscCommander implements PrinterCommander {
                         currentStatus = PrinterStatus.NORMAL;
                     } else if ((buffer[0] & 0x01) > 0) {
                         currentStatus = PrinterStatus.COVER_OPEN;
-                    } else if ((buffer[0] & 0x20) > 0) {
-                        currentStatus = PrinterStatus.FEEDING;
+                    } else if ((buffer[0] & 0x02) > 0) {
+                        currentStatus = PrinterStatus.PAPER_ERROR;
                     } else if ((buffer[0] & 0x04) > 0) {
                         currentStatus = PrinterStatus.PAPER_OUT;
-                    } else if ((buffer[0] & 0x80) > 0) {
-                        currentStatus = PrinterStatus.ERROR;
+                    } else if ((buffer[0] & 0x08) > 0) {
+                        currentStatus = PrinterStatus.CARBON_OUT;
+                    } else if ((buffer[0] & 0x10) > 0) {
+                        currentStatus = PrinterStatus.FEEDING;
+                    } else if ((buffer[0] & 0x20) > 0) {
+                        currentStatus = PrinterStatus.FEEDING;
                     } else {
                         currentStatus = PrinterStatus.UNKNOWN_ERROR;
                     }
@@ -143,6 +147,16 @@ public class TscCommander implements PrinterCommander {
 
         @Override
         public void addQRCode(String content, byte moduleSize, ErrorLevel errorLevel) {
+
+        }
+
+        @Override
+        public void addBeep(byte n, byte time) {
+
+        }
+
+        @Override
+        public void addOpenDrawer() {
 
         }
 

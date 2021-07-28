@@ -7,7 +7,6 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.bluetooth.BluetoothDevice;
 import android.content.DialogInterface;
-import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -41,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvPrinterConnected;
     private Button btSelectBluetooth;
     private Button btSelectWlan;
+    private Button btSelectSunmi;
     private Button btStatus;
     private Button btPrint;
 
@@ -130,6 +130,7 @@ public class MainActivity extends AppCompatActivity {
         btPrint = findViewById(R.id.bt_print);
         btSelectBluetooth = findViewById(R.id.bt_select_bluetooth);
         btSelectWlan = findViewById(R.id.bt_select_wlan);
+        btSelectSunmi = findViewById(R.id.bt_select_sunmi);
 
         btSelectBluetooth.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -141,6 +142,16 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 showSelectWlanPrinter();
+            }
+        });
+        btSelectSunmi.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                initPrinter(PrinterManager
+                    .sunmiPrinter()
+                    .name("SUNMI")
+                    .printWidth(PrintWidth.WIDTH_58.getWidth())
+                );
             }
         });
         btStatus.setOnClickListener(new View.OnClickListener() {
@@ -224,7 +235,13 @@ public class MainActivity extends AppCompatActivity {
 
     public void initPrinter(EscPosPrinter.Builder builder) {
         if (printer != null) {
-            printer.disconnect();
+            EscPosPrinter currentPrinter = printer;
+            new Thread() {
+                @Override
+                public void run() {
+                    currentPrinter.disconnect();
+                }
+            }.start();
         }
         printer = builder
             .printWidth(PrintWidth.WIDTH_80.getWidth())
@@ -296,8 +313,9 @@ public class MainActivity extends AppCompatActivity {
                 paper.addText("打印一维码");
                 paper.addBarcode("3123040", BarcodeType.CODABAR, (byte) 40, (byte) 2, HriPosition.NONE);
                 paper.addCutPaper();
+                paper.addBeep((byte) 3, (byte) 1000);
                 PrintResult result = printer.print(paper);
-                // printer.close();
+                // printer.disconnect();
                 ToastUtils.showLong("已发送: " + result.isSent() + " 数据大小: " + result.getTotalBytes());
             }
         }.start();
