@@ -63,7 +63,14 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:text="选择局域网打印机" />
-    
+
+    <Button
+        android:id="@+id/bt_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="检测状态" />
+
     <Button
         android:id="@+id/bt_print"
         android:layout_width="match_parent"

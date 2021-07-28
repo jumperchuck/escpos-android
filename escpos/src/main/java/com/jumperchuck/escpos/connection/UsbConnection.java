@@ -11,6 +11,7 @@ import java.util.Vector;
 
 public class UsbConnection extends PrinterConnection {
     private UsbPort portManager;
+    private boolean isConnect;
 
     public UsbConnection(Context context, UsbDevice usbDevice) {
         this.portManager = new UsbPort(context, usbDevice);
@@ -33,8 +34,13 @@ public class UsbConnection extends PrinterConnection {
     }
 
     @Override
+    public boolean isConnected() {
+        return isConnect;
+    }
+
+    @Override
     public void writeData(byte[] data, int off, int len) throws IOException {
-        portManager.writeDataImmediately(bytes2VectorByte(data), off, len);
+        portManager.writeDataImmediately(bytesToVectorByte(data), off, len);
     }
 
     @Override

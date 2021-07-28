@@ -18,10 +18,15 @@ import android.widget.TextView;
 
 import com.blankj.utilcode.util.ResourceUtils;
 import com.blankj.utilcode.util.ToastUtils;
+import com.jumperchuck.escpos.constant.AlignType;
+import com.jumperchuck.escpos.constant.BarcodeType;
+import com.jumperchuck.escpos.constant.ErrorLevel;
+import com.jumperchuck.escpos.constant.HriPosition;
 import com.jumperchuck.escpos.constant.PrintWidth;
 import com.jumperchuck.escpos.constant.PrinterStatus;
 import com.jumperchuck.escpos.printer.Paper;
 import com.jumperchuck.escpos.printer.EscPosPrinter;
+import com.jumperchuck.escpos.printer.PrintResult;
 import com.jumperchuck.escpos.scanner.DeviceScanner;
 
 import java.net.InetAddress;
@@ -36,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvPrinterConnected;
     private Button btSelectBluetooth;
     private Button btSelectWlan;
+    private Button btStatus;
     private Button btPrint;
 
     private AlertDialog alertDialog;
@@ -120,6 +126,7 @@ public class MainActivity extends AppCompatActivity {
         tvPrinterInfo = findViewById(R.id.tv_printer_info);
         tvPrinterStatus = findViewById(R.id.tv_printer_status);
         tvPrinterConnected = findViewById(R.id.tv_printer_connected);
+        btStatus = findViewById(R.id.bt_status);
         btPrint = findViewById(R.id.bt_print);
         btSelectBluetooth = findViewById(R.id.bt_select_bluetooth);
         btSelectWlan = findViewById(R.id.bt_select_wlan);
@@ -134,6 +141,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 showSelectWlanPrinter();
+            }
+        });
+        btStatus.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                checkStatus();
             }
         });
         btPrint.setOnClickListener(new View.OnClickListener() {
@@ -210,26 +223,28 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void initPrinter(EscPosPrinter.Builder builder) {
+        if (printer != null) {
+            printer.disconnect();
+        }
         printer = builder
             .printWidth(PrintWidth.WIDTH_80.getWidth())
             .feedBeforeCut((byte) 3)
             .listener(new EscPosPrinter.Listener() {
                 @Override
-                public void onOpening() {
+                public void onStatusChanged(PrinterStatus printerStatus) {
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            tvPrinterConnected.setText("connecting...");
-                        }
-                    });
-                }
-
-                @Override
-                public void onOpened() {
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            tvPrinterConnected.setText("connected");
+                            switch (printerStatus) {
+                                case CONNECTING:
+                                case CONNECTED:
+                                case CONNECT_TIMEOUT:
+                                case DISCONNECTED:
+                                    tvPrinterConnected.setText(printerStatus.getMessage());
+                                    break;
+                                default:
+                                    tvPrinterStatus.setText(printerStatus.getMessage());
+                            }
                         }
                     });
                 }
@@ -240,24 +255,25 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 @Override
-                public void onClosed() {
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            tvPrinterConnected.setText("disconnected");
-                        }
-                    });
-                }
-
-                @Override
                 public void onError(Exception e) {
 
                 }
             })
             .build();
-        tvPrinterInfo.setText(printer.getConnectType() + " / " + printer.getName());
+        tvPrinterInfo.setText(printer.connectType() + " / " + printer.getName());
         tvPrinterStatus.setText("");
         tvPrinterConnected.setText("");
+    }
+
+    public void checkStatus() {
+        new Thread() {
+            @Override
+            public void run() {
+                if (printer == null) return;
+                PrinterStatus status = printer.getPrinterStatus();
+                ToastUtils.showLong(status.getMessage());
+            }
+        }.start();
     }
 
     public void print() {
@@ -265,30 +281,24 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 if (printer == null) return;
                 Paper paper = new Paper();
-                paper.addAlign(Paper.ALIGN.LEFT);
+                paper.addAlign(AlignType.LEFT);
                 paper.addText("打印图片");
                 // paper.addImage(BitmapFactory.decodeResource(getResources(), R.drawable.printer));
                 // paper.addCutPaper();
-                paper.addAlign(Paper.ALIGN.CENTER);
+                paper.addAlign(AlignType.CENTER);
                 paper.addText("打印HTML");
                 paper.addHtml(ResourceUtils.readRaw2String(R.raw.html));
                 paper.addCutPaper();
-                paper.addAlign(Paper.ALIGN.RIGHT);
+                paper.addAlign(AlignType.RIGHT);
                 paper.addText("打印二维码");
-                paper.addQRCode("http://www.baidu.com", (byte) 3, Paper.ERROR_LEVEL.H);
-                paper.addAlign(Paper.ALIGN.CENTER);
+                paper.addQRCode("http://www.baidu.com", (byte) 3, ErrorLevel.H);
+                paper.addAlign(AlignType.CENTER);
                 paper.addText("打印一维码");
-                paper.addBarcode("3123040", Paper.BARCODE_TYPE.CODABAR, (byte) 40, (byte) 2, Paper.HRI_POSITION.NONE);
+                paper.addBarcode("3123040", BarcodeType.CODABAR, (byte) 40, (byte) 2, HriPosition.NONE);
                 paper.addCutPaper();
-                paper.setListener(new Paper.Listener() {
-                    @Override
-                    public void onPrintResult(EscPosPrinter printerManager, PrinterStatus printerStatus) {
-
-                    }
-                });
-                PrinterStatus printerStatus = printer.print(paper);
+                PrintResult result = printer.print(paper);
                 // printer.close();
-                ToastUtils.showLong(printerStatus.getMessage());
+                ToastUtils.showLong("已发送: " + result.isSent() + " 数据大小: " + result.getTotalBytes());
             }
         }.start();
     }

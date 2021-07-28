@@ -13,29 +13,29 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class HtmlUtils {
-    private static WebView webView;
+    private static Handler main = new Handler(Looper.getMainLooper());
 
-    public static Bitmap toBitmap(final Context context, final String html, final int width) {
+    public static Bitmap toBitmap(Context context, final String html, final int width) {
         try {
             final Map<String, Bitmap> bitmaps = new HashMap();
             Thread thread = new Thread() {
-                private boolean isRun = true;
+                private volatile boolean isRun = true;
+
+                private WebView webView;
 
                 public void run() {
-                    // ui线程创建webView
-                    new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    // ui线程创建
+                    main.post(new Runnable() {
                         @Override
                         public void run() {
-                            if (webView == null) {
-                                webView = new WebView(context);
-                                WebSettings webSettings = webView.getSettings();
-                                webSettings.setJavaScriptEnabled(true);
-                                webSettings.setLoadWithOverviewMode(true);
-                                webSettings.setUseWideViewPort(true);
-                                webSettings.setBuiltInZoomControls(true);
-                                webSettings.setDisplayZoomControls(false);
-                                webSettings.setDefaultTextEncodingName("utf-8");
-                            }
+                            webView = new WebView(context);
+                            WebSettings webSettings = webView.getSettings();
+                            webSettings.setJavaScriptEnabled(true);
+                            webSettings.setLoadWithOverviewMode(true);
+                            webSettings.setUseWideViewPort(true);
+                            webSettings.setBuiltInZoomControls(true);
+                            webSettings.setDisplayZoomControls(false);
+                            webSettings.setDefaultTextEncodingName("utf-8");
 
                             webView.measure(width, 400);
                             webView.layout(0, 0, width, 400);
@@ -76,6 +76,16 @@ public class HtmlUtils {
                     });
 
                     while (isRun) { }
+
+                    if (webView != null) {
+                        // ui线程摧毁
+                        main.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                webView.destroy();
+                            }
+                        });
+                    }
                 }
             };
 

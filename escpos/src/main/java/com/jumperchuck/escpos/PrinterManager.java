@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.hardware.usb.UsbDevice;
 
+import com.jumperchuck.escpos.command.SunmiCommander;
 import com.jumperchuck.escpos.connection.BluetoothConnection;
 import com.jumperchuck.escpos.connection.SunmiConnection;
 import com.jumperchuck.escpos.connection.TcpConnection;
@@ -39,9 +40,10 @@ public class PrinterManager {
             .connection(new UsbConnection(context, usbDevice));
     }
 
-    public static SunmiPrinter.Builder sunmiPrinter() {
-        return new SunmiPrinter.Builder(context)
-            .connection(new SunmiConnection(context));
+    public static GeneralPrinter.Builder sunmiPrinter() {
+        return new GeneralPrinter.Builder(context)
+            .connection(new SunmiConnection(context))
+            .commander(new SunmiCommander());
     }
 
     public static SunmiPrinterService sunmiService() {

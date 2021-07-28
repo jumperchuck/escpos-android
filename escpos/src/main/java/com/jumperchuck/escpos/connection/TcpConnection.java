@@ -7,12 +7,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.Vector;
 
 public class TcpConnection extends PrinterConnection {
-    private static final String TAG = TcpConnection.class.getSimpleName();
-
     private InputStream inputStream;
     private OutputStream outputStream;
+    private boolean isConnect;
     private Socket socket;
     private String ip;
     private int port;
@@ -76,11 +76,21 @@ public class TcpConnection extends PrinterConnection {
     }
 
     @Override
+    public boolean isConnected() {
+        return isConnect;
+    }
+
+    @Override
     public void writeData(byte[] data, int off, int len) throws IOException {
         if (outputStream != null && data.length > 0) {
             outputStream.write(data, off, len);
             outputStream.flush();
         }
+    }
+
+    @Override
+    public void writeData(Vector<Byte> data, int off, int len) throws IOException {
+        writeData(vectorByteToBytes(data), off, len);
     }
 
     @Override

@@ -9,6 +9,7 @@ import java.util.Vector;
 
 public class BluetoothConnection extends PrinterConnection {
     private BluetoothPort portManager;
+    private boolean isConnect;
 
     public BluetoothConnection(String macAddress) {
         this.portManager = new BluetoothPort(macAddress);
@@ -31,8 +32,13 @@ public class BluetoothConnection extends PrinterConnection {
     }
 
     @Override
+    public boolean isConnected() {
+        return isConnect;
+    }
+
+    @Override
     public void writeData(byte[] data, int off, int len) throws IOException {
-        portManager.writeDataImmediately(bytes2VectorByte(data), off, len);
+        portManager.writeDataImmediately(bytesToVectorByte(data), off, len);
     }
 
     @Override

@@ -2,7 +2,10 @@ package com.jumperchuck.escpos.printer;
 
 import android.graphics.Bitmap;
 
-import com.jumperchuck.escpos.constant.PrinterStatus;
+import com.jumperchuck.escpos.constant.AlignType;
+import com.jumperchuck.escpos.constant.BarcodeType;
+import com.jumperchuck.escpos.constant.ErrorLevel;
+import com.jumperchuck.escpos.constant.HriPosition;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,18 +24,8 @@ public class Paper {
 
     private List<Command> commands = new ArrayList<>();
 
-    private Listener listener;
-
     public List<Command> getCommands() {
         return commands;
-    }
-
-    public void setListener(Listener listener) {
-        this.listener = listener;
-    }
-
-    public Listener getListener() {
-        return listener;
     }
 
     public Paper addInit() {
@@ -40,7 +33,7 @@ public class Paper {
         return this;
     }
 
-    public Paper addAlign(ALIGN align) {
+    public Paper addAlign(AlignType align) {
         this.commands.add(new Command(COMMAND_ALIGN, align));
         return this;
     }
@@ -75,12 +68,12 @@ public class Paper {
         return this;
     }
 
-    public Paper addBarcode(String value, BARCODE_TYPE type, byte height, byte width, HRI_POSITION hriPosition) {
+    public Paper addBarcode(String value, BarcodeType type, byte height, byte width, HriPosition hriPosition) {
         this.commands.add(new Command(COMMAND_BARCODE, value, type, height, width, hriPosition));
         return this;
     }
 
-    public Paper addQRCode(String value, byte moduleSize, ERROR_LEVEL errorLevel) {
+    public Paper addQRCode(String value, byte moduleSize, ErrorLevel errorLevel) {
         this.commands.add(new Command(COMMAND_QRCODE, value, moduleSize, errorLevel));
         return this;
     }
@@ -88,45 +81,6 @@ public class Paper {
     public Paper addCutPaper() {
         this.commands.add(new Command(COMMAND_CUT_PAPER));
         return this;
-    }
-
-    public interface Listener {
-        void onPrintResult(EscPosPrinter printer, PrinterStatus printerStatus);
-    }
-
-    public enum ALIGN {
-        LEFT,
-        CENTER,
-        RIGHT
-    }
-
-    public enum BARCODE_TYPE {
-        UPCA,
-        UPCE,
-        EAN13,
-        EAN8,
-        ITF,
-        CODABAR,
-        CODE39,
-        CODE93,
-        CODE128,
-        CODE128A,
-        CODE128B,
-        CODE128C
-    }
-
-    public enum HRI_POSITION {
-        NONE,
-        TOP,
-        BOTTOM,
-        BOTH
-    }
-
-    public enum ERROR_LEVEL {
-        L,
-        M,
-        Q,
-        H
     }
 
     public static class Command {

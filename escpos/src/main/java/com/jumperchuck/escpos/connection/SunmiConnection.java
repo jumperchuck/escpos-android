@@ -9,6 +9,7 @@ import com.sunmi.peripheral.printer.InnerPrinterManager;
 import com.sunmi.peripheral.printer.SunmiPrinterService;
 
 import java.io.IOException;
+import java.util.Vector;
 
 public class SunmiConnection extends PrinterConnection {
     private static SunmiPrinterService service;
@@ -63,6 +64,11 @@ public class SunmiConnection extends PrinterConnection {
 
     @Override
     public void writeData(byte[] data, int off, int len) throws IOException {
+
+    }
+
+    @Override
+    public void writeData(Vector<Byte> data, int off, int len) throws IOException {
 
     }
 
