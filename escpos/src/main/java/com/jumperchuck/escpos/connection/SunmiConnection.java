@@ -11,7 +11,7 @@ import com.sunmi.peripheral.printer.SunmiPrinterService;
 import java.io.IOException;
 import java.util.Vector;
 
-public class SunmiConnection implements PrinterConnection {
+public class SunmiConnection extends PrinterConnection {
     private static SunmiPrinterService service;
 
     private static InnerPrinterCallback callback = new InnerPrinterCallback() {
@@ -38,6 +38,8 @@ public class SunmiConnection implements PrinterConnection {
         return service;
     }
 
+    private boolean isConnect;
+
     public SunmiConnection(Context context) {
 
     }
@@ -49,26 +51,26 @@ public class SunmiConnection implements PrinterConnection {
 
     @Override
     public void connect() {
-
+        isConnect = true;
     }
 
     @Override
     public void disconnect() {
-
+        isConnect = false;
     }
 
     @Override
     public boolean isConnected() {
-        return service != null;
+        return isConnect && service != null;
     }
 
     @Override
-    public void writeData(Vector<Byte> data) throws IOException {
+    public void writeData(byte[] data, int off, int len) throws IOException {
 
     }
 
     @Override
-    public void writeData(Vector<Byte> data, int offset, int len) throws IOException {
+    public void writeData(Vector<Byte> data, int off, int len) throws IOException {
 
     }
 

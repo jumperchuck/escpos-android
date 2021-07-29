@@ -2,36 +2,55 @@ package com.jumperchuck.escpos.printer;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.webkit.WebView;
 
+import com.jumperchuck.escpos.command.FactoryCommander;
+import com.jumperchuck.escpos.command.PrinterCommander;
 import com.jumperchuck.escpos.connection.PrinterConnection;
-import com.jumperchuck.escpos.connection.SunmiConnection;
+import com.jumperchuck.escpos.constant.ConnectType;
 import com.jumperchuck.escpos.constant.PrintWidth;
-import com.jumperchuck.escpos.constant.PrinterCommand;
 import com.jumperchuck.escpos.constant.PrinterStatus;
+import com.jumperchuck.escpos.util.HtmlUtils;
 
-public abstract class EscPosPrinter {
-    private int id;
+import java.io.IOException;
+import java.util.Vector;
 
-    private String name;
+public abstract class EscPosPrinter extends PrinterConnection {
+    protected int id;
 
-    private Context context;
+    protected String name;
 
-    protected PrinterConnection printerConnection;
+    protected Context context;
 
-    protected PrinterCommand printerCommand;
+    protected PrinterConnection connection;
 
-    protected int printWidth;
+    protected PrinterCommander commander;
 
     protected Listener listener;
 
-    public EscPosPrinter(Builder builder) {
+    protected int printWidth;
+
+    protected byte feedBeforeCut;
+
+    protected int timeout;
+
+    protected int soTimeout;
+
+    EscPosPrinter(Builder builder) {
         this.id = builder.id;
         this.name = builder.name;
         this.context = builder.context;
-        this.printerConnection = builder.printerConnection;
-        this.printerCommand = builder.printerCommand;
-        this.printWidth = builder.printWidth;
+        this.connection = builder.connection;
+        this.commander = builder.commander;
         this.listener = builder.listener;
+        this.printWidth = builder.printWidth;
+        this.feedBeforeCut = builder.feedBeforeCut;
+        this.timeout = builder.timeout;
+        this.soTimeout = builder.soTimeout;
+        if (this.commander == null) {
+            this.commander = new FactoryCommander();
+        }
     }
 
     public int getId() {
@@ -50,24 +69,57 @@ public abstract class EscPosPrinter {
         return printWidth;
     }
 
-    public boolean isConnected() {
-        return printerConnection.isConnected();
+    public byte getFeedBeforeCut() {
+        return feedBeforeCut;
     }
 
-    /**
-     * 连接
-     */
-    public abstract void open();
+    @Override
+    public ConnectType connectType() {
+        return connection.connectType();
+    }
 
-    /**
-     * 关闭
-     */
-    public abstract void close();
+    @Override
+    public boolean isConnected() {
+        return connection.isConnected();
+    }
+
+    @Override
+    public void writeData(Vector<Byte> data, int off, int len) throws IOException {
+        try {
+            connection.writeData(data, off, len);
+        } catch (IOException e) {
+            // 异常中断
+            disconnect();
+            throw e;
+        }
+    }
+
+    @Override
+    public void writeData(byte[] data, int off, int len) throws IOException {
+        try {
+            connection.writeData(data, off, len);
+        } catch (IOException e) {
+            // 异常中断
+            disconnect();
+            throw e;
+        }
+    }
+
+    @Override
+    public int readData(byte[] bytes) throws IOException {
+        try {
+            return connection.readData(bytes);
+        } catch (IOException e) {
+            // 异常中断
+            disconnect();
+            throw e;
+        }
+    }
 
     /**
      * 发送数据打印
      */
-    public abstract PrinterStatus print(Paper paper);
+    public abstract PrintResult print(Paper paper);
 
     /**
      * 检测打印机状态
@@ -81,74 +133,98 @@ public abstract class EscPosPrinter {
         Intent intent = new Intent("PRINTER_STATUS");
         intent.putExtra("id", getId());
         intent.putExtra("name", getName());
-        intent.putExtra("connectType", printerConnection.connectType());
+        intent.putExtra("connectType", connection.connectType().getName());
         intent.putExtra("code", printerStatus.getCode());
         intent.putExtra("message", printerStatus.getMessage());
-        getContext().sendBroadcast(intent);
+        context.sendBroadcast(intent);
+        if (listener != null) {
+            listener.onStatusChanged(printerStatus);
+        }
     }
 
     public interface Listener {
+        void onStatusChanged(PrinterStatus printerStatus);
+
         void onPrinted(Paper paper, PrinterStatus printerStatus);
 
-        void onError(PrinterStatus printerStatus);
+        void onError(Exception e);
     }
 
-    public static final class Builder {
-
+    public abstract static class Builder<T extends Builder> {
         int id;
 
         String name;
 
         Context context;
 
-        PrinterConnection printerConnection;
+        PrinterConnection connection;
 
-        PrinterCommand printerCommand;
+        PrinterCommander commander;
+
+        Listener listener;
 
         int printWidth = PrintWidth.WIDTH_80.getWidth();
 
-        EscPosPrinter.Listener listener;
+        byte feedBeforeCut = 1;
 
-        public EscPosPrinter.Builder id(int id) {
-            this.id = id;
-            return this;
-        }
+        int timeout = 6000;
 
-        public EscPosPrinter.Builder name(String name) {
-            this.name = name;
-            return this;
-        }
+        int soTimeout = 4000;
 
-        public EscPosPrinter.Builder context(Context context) {
+        Builder(Context context) {
             this.context = context;
-            return this;
         }
 
-        public EscPosPrinter.Builder printerConnection(PrinterConnection printerConnection) {
-            this.printerConnection = printerConnection;
-            return this;
+        public T id(int id) {
+            this.id = id;
+            return (T) this;
         }
 
-        public EscPosPrinter.Builder printerCommand(PrinterCommand printerCommand) {
-            this.printerCommand = printerCommand;
-            return this;
+        public T name(String name) {
+            this.name = name;
+            return (T) this;
         }
 
-        public EscPosPrinter.Builder printWidth(int printWidth) {
-            this.printWidth = printWidth;
-            return this;
+        public T context(Context context) {
+            this.context = context;
+            return (T) this;
         }
 
-        public EscPosPrinter.Builder listener(EscPosPrinter.Listener listener) {
+        public T connection(PrinterConnection connection) {
+            this.connection = connection;
+            return (T) this;
+        }
+
+        public T commander(PrinterCommander commander) {
+            this.commander = commander;
+            return (T) this;
+        }
+
+        public T listener(Listener listener) {
             this.listener = listener;
-            return this;
+            return (T) this;
         }
 
-        public EscPosPrinter build() {
-            if (printerConnection instanceof SunmiConnection) {
-                return new SunmiPrinter(this);
-            }
-            return new GeneralPrinter(this);
+        public T printWidth(int printWidth) {
+            this.printWidth = printWidth;
+            return (T) this;
         }
+
+        public T feedBeforeCut(byte feedBeforeCut) {
+            this.feedBeforeCut = feedBeforeCut;
+            return (T) this;
+        }
+
+        public T timeout(int timeout) {
+            this.timeout = timeout;
+            return (T) this;
+        }
+
+        public T soTimeout(int soTimeout) {
+            this.soTimeout = soTimeout;
+            return (T) this;
+        }
+
+        public abstract EscPosPrinter build();
     }
 }

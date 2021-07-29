@@ -35,14 +35,16 @@ public abstract class DeviceScanner {
         void onError(Exception e);
     }
 
-    protected abstract static class Builder<T extends Builder> {
+    public abstract static class Builder<T extends Builder> {
         Context context;
 
         int timeout;
 
         Listener listener;
 
-        Builder() { }
+        Builder(Context context) {
+            this.context = context;
+        }
 
         public T context(Context context) {
             this.context = context;

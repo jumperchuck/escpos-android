@@ -4,11 +4,13 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.hardware.usb.UsbDevice;
 
+import com.jumperchuck.escpos.command.SunmiCommander;
 import com.jumperchuck.escpos.connection.BluetoothConnection;
 import com.jumperchuck.escpos.connection.SunmiConnection;
 import com.jumperchuck.escpos.connection.TcpConnection;
 import com.jumperchuck.escpos.connection.UsbConnection;
-import com.jumperchuck.escpos.printer.EscPosPrinter;
+import com.jumperchuck.escpos.printer.GeneralPrinter;
+import com.jumperchuck.escpos.printer.SunmiPrinter;
 import com.jumperchuck.escpos.scanner.BluetoothScanner;
 import com.jumperchuck.escpos.scanner.WlanScanner;
 import com.sunmi.peripheral.printer.SunmiPrinterService;
@@ -23,41 +25,36 @@ public class PrinterManager {
         SunmiConnection.init(context);
     }
 
-    public static EscPosPrinter.Builder bluetoothPrinter(String macAddress) {
-        return new EscPosPrinter.Builder()
-            .printerConnection(new BluetoothConnection(macAddress))
-            .context(context);
+    public static GeneralPrinter.Builder bluetoothPrinter(String macAddress) {
+        return new GeneralPrinter.Builder(context)
+            .connection(new BluetoothConnection(macAddress));
     }
 
-    public static EscPosPrinter.Builder tcpPrinter(String ip, int port) {
-        return new EscPosPrinter.Builder()
-            .printerConnection(new TcpConnection(ip, port))
-            .context(context);
+    public static GeneralPrinter.Builder tcpPrinter(String ip, int port) {
+        return new GeneralPrinter.Builder(context)
+            .connection(new TcpConnection(ip, port));
     }
 
-    public static EscPosPrinter.Builder usbPrinter(UsbDevice usbDevice) {
-        return new EscPosPrinter.Builder()
-            .printerConnection(new UsbConnection(context, usbDevice))
-            .context(context);
+    public static GeneralPrinter.Builder usbPrinter(UsbDevice usbDevice) {
+        return new GeneralPrinter.Builder(context)
+            .connection(new UsbConnection(context, usbDevice));
     }
 
-    public static EscPosPrinter.Builder sunmiPrinter() {
-        return new EscPosPrinter.Builder()
-            .printerConnection(new SunmiConnection(context))
-            .context(context);
+    public static GeneralPrinter.Builder sunmiPrinter() {
+        return new GeneralPrinter.Builder(context)
+            .connection(new SunmiConnection(context))
+            .commander(new SunmiCommander());
     }
 
-    public static SunmiPrinterService sunmiPrinterService() {
+    public static SunmiPrinterService sunmiService() {
         return SunmiConnection.getService();
     }
 
     public static BluetoothScanner.Builder bluetoothScanner() {
-        return new BluetoothScanner.Builder()
-            .context(context);
+        return new BluetoothScanner.Builder(context);
     }
 
     public static WlanScanner.Builder wlanScanner() {
-        return new WlanScanner.Builder()
-            .context(context);
+        return new WlanScanner.Builder(context);
     }
 }

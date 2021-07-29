@@ -8,15 +8,47 @@
     android:padding="10dp"
     tools:context=".MainActivity">
 
-    <EditText
-        android:id="@+id/et_printer_ip"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="40dp" />
+        android:layout_height="wrap_content">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="打印机信息: "/>
+        <TextView
+            android:id="@+id/tv_printer_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""/>
+    </LinearLayout>
 
-    <EditText
-        android:id="@+id/et_printer_port"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="40dp" />
+        android:layout_height="wrap_content">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="打印机状态: "/>
+        <TextView
+            android:id="@+id/tv_printer_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="连接: "/>
+        <TextView
+            android:id="@+id/tv_printer_connected"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""/>
+    </LinearLayout>
 
     <Button
         android:id="@+id/bt_select_bluetooth"
@@ -31,19 +63,26 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:text="选择局域网打印机" />
-    
-    <Button
-        android:id="@+id/bt_print_image"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:text="打印图片" />
 
     <Button
-        android:id="@+id/bt_print_html"
+        android:id="@+id/bt_select_sunmi"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:text="打印HTML" />
+        android:text="选择商米内置打印机" />
+
+    <Button
+        android:id="@+id/bt_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="检测状态" />
+
+    <Button
+        android:id="@+id/bt_print"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="打印" />
 
 </androidx.appcompat.widget.LinearLayoutCompat>
