@@ -7,6 +7,7 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.bluetooth.BluetoothDevice;
 import android.content.DialogInterface;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -300,8 +301,8 @@ public class MainActivity extends AppCompatActivity {
                 Paper paper = new Paper();
                 paper.addAlign(AlignType.LEFT);
                 paper.addText("打印图片");
-                // paper.addImage(BitmapFactory.decodeResource(getResources(), R.drawable.printer));
-                // paper.addCutPaper();
+                paper.addImage(BitmapFactory.decodeResource(getResources(), R.drawable.printer));
+                paper.addCutPaper();
                 paper.addAlign(AlignType.CENTER);
                 paper.addText("打印HTML");
                 paper.addHtml(ResourceUtils.readRaw2String(R.raw.html));
@@ -314,6 +315,7 @@ public class MainActivity extends AppCompatActivity {
                 paper.addBarcode("3123040", BarcodeType.CODABAR, (byte) 40, (byte) 2, HriPosition.NONE);
                 paper.addCutPaper();
                 paper.addBeep((byte) 3, (byte) 1000);
+                paper.addOpenDrawer();
                 PrintResult result = printer.print(paper);
                 // printer.disconnect();
                 ToastUtils.showLong("已发送: " + result.isSent() + " 数据大小: " + result.getTotalBytes());
